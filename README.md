@@ -51,8 +51,9 @@ Pengelolaan aspirasi masyarakat dan penanganan keluhan fasilitas publik di Nagar
 
 ### 1. Modul Pelaporan Warga
 - **Formulir Terstandar**: Pengisian judul, kategori aduan (infrastruktur, lingkungan, administrasi, sosial), deskripsi lengkap, dan pilihan wilayah **Jorong**.
-- **Bukti & Lokasi Presisi**: Pengunggahan lampiran foto bukti kejadian, penentuan patokan alamat, serta integrasi titik koordinat GPS.
-- **Opsi Anonim**: Warga dapat memilih melapor menggunakan identitas pribadi atau secara anonim guna melindungi privasi.
+- **Wajib Foto Bukti Presisi**: **Wajib melampirkan minimal 1 foto bukti kejadian** (format: JPG, JPEG, PNG, WebP; maksimal 5 MB/foto; mendukung pengunggahan lebih dari 1 foto). Dokumen selain gambar (.docx, .pdf, dll.) tidak diizinkan.
+- **Lokasi Kejadian**: Penentuan patokan alamat kejadian serta integrasi titik koordinat GPS.
+- **Opsi Anonim**: Warga dapat memilih melapor menggunakan identitas pribadi atau secara anonim guna melindungi privasi pelapor.
 - **Kode Tiket Otomatis**: Setiap laporan yang berhasil dikirim langsung memperoleh kode tiket unik (misal: `SLP-202610-A9B2`) untuk disimpan oleh warga.
 
 ### 2. Modul Pelacakan Mandiri (Public Tracking)
@@ -66,13 +67,15 @@ Pengelolaan aspirasi masyarakat dan penanganan keluhan fasilitas publik di Nagar
 
 ### 3. Modul Pengelolaan Aparatur (Admin Nagari)
 - **Otentikasi Aman**: Login berbasis hak akses khusus aparatur nagari.
+- **Dashboard Operasional**: Antrean kerja harian untuk memantau laporan baru yang butuh verifikasi dan tindakan cepat.
 - **Pemeriksaan Berkas & Lokasi**: Meninjau foto bukti resolusi penuh serta titik lokasi pada peta.
-- **Pembaruan Status & Riwayat**: Memperbarui tahapan status penanganan dan menuliskan catatan tindak lanjut yang tersimpan otomatis pada riwayat laporan.
+- **Pembaruan Status & Riwayat (CRUD)**: Memperbarui tahapan status penanganan dan menuliskan catatan tindak lanjut yang tersimpan otomatis pada riwayat laporan.
 - **Pencetakan Rekap**: Fitur cetak rekapitulasi laporan masuk untuk kebutuhan arsip dan administrasi nagari.
 
-### 4. Dashboard Eksekutif (Wali Nagari)
-- **Ringkasan Indikator Kunci (KPI)**: Total laporan masuk, jumlah diselesaikan, laporan sedang diproses, dan persentase penyelesaian.
+### 4. Modul Pemantauan Pimpinan (Wali Nagari)
+- **Dashboard Eksekutif (Makro)**: Ringkasan indikator kunci (KPI), total laporan masuk, jumlah diselesaikan, laporan sedang diproses, serta persentase penyelesaian.
 - **Grafik Distribusi**: Visualisasi statistik keluhan berdasarkan kategori aduan dan sebaran wilayah jorong di Nagari Kambang Utara.
+- **Akses Detail Laporan (Read-Only)**: Wali Nagari dapat membuka rincian detail laporan, foto bukti, dan riwayat penanganan secara langsung untuk evaluasi mendalam tanpa wewenang mengubah data teknis.
 
 ---
 
@@ -301,8 +304,9 @@ SILAPOR-KU/
 ├── next.config.ts          # Konfigurasi Next.js
 ├── tailwind.config.ts      # Konfigurasi tema & styling Tailwind CSS
 ├── tsconfig.json           # Konfigurasi TypeScript
+├── docs/                   # Dokumentasi proyek
+│   └── PRD.md              # Dokumen Product Requirements resmi (v1.1)
 ├── package.json            # Daftar dependensi & scripts proyek
-├── PRD.md                  # Dokumen Product Requirements resmi
 └── README.md               # Dokumentasi utama proyek
 ```
 
@@ -388,15 +392,16 @@ Buka peramban Anda di [http://localhost:3000](http://localhost:3000) untuk menga
 | Fitur / Aksi | Warga (Publik) | Admin Nagari | Wali Nagari |
 | :--- | :---: | :---: | :---: |
 | Mengisi Formulir Pengaduan/Aspirasi | ✅ | ✅ | ✅ |
-| Melampirkan Foto Bukti & Titik GPS | ✅ | ✅ | ✅ |
+| Melampirkan Foto Bukti Kejadian (**Wajib, min 1 foto**) | ✅ | ✅ | ✅ |
 | Opsi Pengiriman Anonim | ✅ | ❌ | ❌ |
-| Melacak Status via Kode Tiket | ✅ | ✅ | ✅ |
+| Melacak Progres via Kode Tiket | ✅ | ✅ | ✅ |
+| Mengakses Dashboard Operasional (Antrean Laporan & Aksi Cepat) | ❌ | ✅ | ❌ |
+| Mengakses Dashboard Eksekutif (Statistik Makro & Analitik) | ❌ | ❌ | ✅ |
 | Melihat Daftar Semua Laporan Masuk | ❌ | ✅ | ✅ |
-| Melihat Rincian Lengkap & Foto Asli | ❌ (Hanya miliknya) | ✅ | ✅ |
-| Mengubah Status (*Diproses/Selesai/Tolak*) | ❌ | ✅ | ❌ |
-| Menambahkan Catatan Tindak Lanjut | ❌ | ✅ | ❌ |
-| Mengakses Dashboard Statistik Eksekutif | ❌ | ✅ | ✅ |
-| Mencetak Rekap Laporan Nagari | ❌ | ✅ | ✅ |
+| Melihat Rincian Lengkap & Foto Resolusi Penuh | ❌ (Hanya via Tiket) | ✅ (Akses CRUD) | ✅ (**Read-Only**) |
+| Mengubah Status (*Menunggu $\rightarrow$ Diproses $\rightarrow$ Selesai/Tolak*) | ❌ | ✅ | ❌ |
+| Menambahkan Catatan Resmi Tindak Lanjut | ❌ | ✅ | ❌ |
+| Mencetak Rekapitulasi Laporan Nagari | ❌ | ✅ | ✅ |
 
 ---
 
