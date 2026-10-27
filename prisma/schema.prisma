@@ -1,0 +1,61 @@
+// Prisma Schema untuk SILAPOR-KU (Nagari Kambang Utara)
+// Menggunakan PostgreSQL (Neon Serverless)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  WALI_NAGARI
+}
+
+enum TicketStatus {
+  MENUNGGU
+  DIPROSES
+  SELESAI
+  DITOLAK
+}
+
+model User {
+  id            String    @id @default(cuid())
+  nama          String
+  email         String    @unique
+  password_hash String
+  role          Role      @default(ADMIN)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  tanggapanList Ticket[]  @relation("PetugasTanggapan")
+
+  @@map("users")
+}
+
+model Ticket {
+  id             String       @id @default(cuid())
+  nomor_tiket    String       @unique // Contoh: SLP-202610-ABCD
+  nama_pelapor   String?
+  is_anonim      Boolean      @default(false)
+  nik            String?
+  nomor_telepon  String?
+  judul          String
+  deskripsi      String       @db.Text
+  kategori       String       // Infrastruktur, Layanan Publik, Keamanan, Kebersihan, dll.
+  jorong         String?      // Wilayah jorong di Nagari Kambang Utara
+  lokasi         String       // Alamat / patokan lokasi kejadian
+  lampiran_url   String       @db.Text // Wajib minimal 1 foto bukti (disimpan URL / JSON list foto)
+  status         TicketStatus @default(MENUNGGU)
+  tanggapan      String?      @db.Text
+  petugas_id     String?
+  petugas        User?        @relation("PetugasTanggapan", fields: [petugas_id], references: [id])
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+
+  @@map("tickets")
+}
