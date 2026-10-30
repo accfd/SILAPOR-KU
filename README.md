@@ -1,5 +1,5 @@
 # SILAPOR-KU 🏛️
-### Sistem Informasi Layanan Pengaduan & Aspirasi Nagari Kambang Utara
+### Sistem Informasi Layanan Aspirasi & Pengaduan Nagari Kambang Utara
 
 [![Next.js](https://img.shields.io/badge/Next.js-16%20App%20Router-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev/)
