@@ -1,27 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createTicket } from "@/actions/ticket";
+import { createLaporan, getOpsiFormulir } from "@/lib/actions/laporan";
+import { MAKS_UKURAN_LAMPIRAN, TIPE_LAMPIRAN_DIIZINKAN } from "@/lib/constants";
+import type { CreateLaporanInput, OpsiFormulir } from "@/types";
+
+type LampiranInput = CreateLaporanInput["lampiran"][number];
 import { FileText, Upload, AlertCircle, CheckCircle2, Shield, ArrowLeft, Loader2 } from "lucide-react";
-
-const JORONG_LIST = [
-  "Jorong Pasar Gompong",
-  "Jorong Kambang Barat",
-  "Jorong Kambang Timur",
-  "Jorong Muara Air",
-  "Jorong Koto Berapak",
-];
-
-const KATEGORI_LIST = [
-  "Infrastruktur Jalan & Jembatan",
-  "Fasilitas Umum & Penerangan Jalan",
-  "Kebersihan Lingkungan & Sampah",
-  "Pelayanan Administrasi Nagari",
-  "Bantuan Sosial & Kemasyarakatan",
-  "Keamanan & Ketertiban Umum",
-  "Lainnya",
-];
 
 export default function LaporPage() {
   const [isAnonim, setIsAnonim] = useState(false);
@@ -29,30 +15,47 @@ export default function LaporPage() {
   const [createdTicketCode, setCreatedTicketCode] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [opsi, setOpsi] = useState<OpsiFormulir | null>(null);
+
   const [formData, setFormData] = useState({
     nama_pelapor: "",
-    nik: "",
     nomor_telepon: "",
     judul: "",
-    kategori: KATEGORI_LIST[0],
-    jorong: JORONG_LIST[0],
+    id_kategori: "",
+    id_jorong: "",
     lokasi: "",
     deskripsi: "",
-    lampiran_url: "",
   });
 
+  const [lampiran, setLampiran] = useState<LampiranInput | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    getOpsiFormulir().then((res) => {
+      if (res.success && res.data) {
+        const data = res.data;
+        setOpsi(data);
+        setFormData((prev) => ({
+          ...prev,
+          id_kategori: data.kategori[0]?.id_kategori ?? "",
+          id_jorong: data.jorong[0]?.id_jorong ?? "",
+        }));
+      } else {
+        setErrorMessage(res.message || "Gagal memuat pilihan kategori dan jorong.");
+      }
+    });
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    if (!(TIPE_LAMPIRAN_DIIZINKAN as readonly string[]).includes(file.type)) {
       setErrorMessage("Format berkas harus berupa foto/gambar (JPG, JPEG, PNG, WebP).");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAKS_UKURAN_LAMPIRAN) {
       setErrorMessage("Ukuran foto melebihi batas maksimal 5 MB.");
       return;
     }
@@ -62,8 +65,13 @@ export default function LaporPage() {
     reader.onloadend = () => {
       const result = reader.result as string;
       setFilePreview(result);
-      // Untuk MVP awal, kita simpan Data URL / placeholder URL
-      setFormData((prev) => ({ ...prev, lampiran_url: result }));
+      // Untuk MVP awal, foto dikirim sebagai Data URL (lihat catatan bodySizeLimit di next.config.ts)
+      setLampiran({
+        nama_berkas: file.name,
+        jalur_berkas: result,
+        tipe_berkas: file.type as LampiranInput["tipe_berkas"],
+        ukuran_berkas: file.size,
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -73,7 +81,7 @@ export default function LaporPage() {
     setErrorMessage(null);
 
     // Validasi foto wajib sesuai PRD FR-03 & FR-05
-    if (!formData.lampiran_url) {
+    if (!lampiran) {
       setErrorMessage("Wajib melampirkan minimal 1 foto bukti kondisi di lapangan.");
       return;
     }
@@ -85,13 +93,20 @@ export default function LaporPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await createTicket({
-        ...formData,
+      const result = await createLaporan({
         is_anonim: isAnonim,
+        nama_pelapor: formData.nama_pelapor,
+        nomor_kontak: formData.nomor_telepon,
+        judul_laporan: formData.judul,
+        deskripsi_laporan: formData.deskripsi,
+        id_kategori: formData.id_kategori,
+        id_jorong: formData.id_jorong,
+        patokan_lokasi: formData.lokasi,
+        lampiran: [lampiran],
       });
 
-      if (result.success && result.data?.nomor_tiket) {
-        setCreatedTicketCode(result.data.nomor_tiket);
+      if (result.success && result.data?.kode_tiket) {
+        setCreatedTicketCode(result.data.kode_tiket);
       } else {
         setErrorMessage(result.message || "Gagal mengirim laporan. Silakan periksa kembali formulir.");
       }
@@ -201,7 +216,7 @@ export default function LaporPage() {
             </div>
 
             {!isAnonim ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
                     Nama Lengkap <span className="text-rose-500">*</span>
@@ -212,16 +227,6 @@ export default function LaporPage() {
                     value={formData.nama_pelapor}
                     onChange={(e) => setFormData({ ...formData, nama_pelapor: e.target.value })}
                     placeholder="Nama sesuai KTP"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">NIK (Opsional)</label>
-                  <input
-                    type="text"
-                    value={formData.nik}
-                    onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
-                    placeholder="16 digit NIK"
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                   />
                 </div>
@@ -250,13 +255,13 @@ export default function LaporPage() {
                 Kategori Laporan <span className="text-rose-500">*</span>
               </label>
               <select
-                value={formData.kategori}
-                onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
+                value={formData.id_kategori}
+                onChange={(e) => setFormData({ ...formData, id_kategori: e.target.value })}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
               >
-                {KATEGORI_LIST.map((kat) => (
-                  <option key={kat} value={kat}>
-                    {kat}
+                {opsi?.kategori.map((kat) => (
+                  <option key={kat.id_kategori} value={kat.id_kategori}>
+                    {kat.nama_kategori}
                   </option>
                 ))}
               </select>
@@ -267,13 +272,13 @@ export default function LaporPage() {
                 Wilayah Jorong <span className="text-rose-500">*</span>
               </label>
               <select
-                value={formData.jorong}
-                onChange={(e) => setFormData({ ...formData, jorong: e.target.value })}
+                value={formData.id_jorong}
+                onChange={(e) => setFormData({ ...formData, id_jorong: e.target.value })}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
               >
-                {JORONG_LIST.map((jorong) => (
-                  <option key={jorong} value={jorong}>
-                    {jorong}
+                {opsi?.jorong.map((j) => (
+                  <option key={j.id_jorong} value={j.id_jorong}>
+                    {j.nama_jorong}
                   </option>
                 ))}
               </select>

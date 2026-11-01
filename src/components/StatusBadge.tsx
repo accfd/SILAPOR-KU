@@ -1,9 +1,9 @@
 import { getStatusColor } from "@/lib/utils";
-import { TicketStatus } from "@/types";
+import { StatusLaporan } from "@/types";
 import { Clock, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 interface StatusBadgeProps {
-  status: TicketStatus | string;
+  status: StatusLaporan | string;
   size?: "sm" | "md";
 }
 
@@ -12,13 +12,13 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
 
   const getIcon = () => {
     switch (status) {
-      case "MENUNGGU":
+      case "menunggu":
         return <Clock className={size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5"} />;
-      case "DIPROSES":
+      case "diproses":
         return <Loader2 className={`${size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5"} animate-spin`} />;
-      case "SELESAI":
+      case "selesai":
         return <CheckCircle2 className={size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5"} />;
-      case "DITOLAK":
+      case "ditolak":
         return <XCircle className={size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5"} />;
       default:
         return null;
@@ -27,13 +27,13 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
 
   const getLabel = () => {
     switch (status) {
-      case "MENUNGGU":
+      case "menunggu":
         return "Menunggu Verifikasi";
-      case "DIPROSES":
+      case "diproses":
         return "Sedang Diproses";
-      case "SELESAI":
+      case "selesai":
         return "Selesai Ditindaklanjuti";
-      case "DITOLAK":
+      case "ditolak":
         return "Laporan Ditolak";
       default:
         return status;

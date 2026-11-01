@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { getTicketByCode } from "@/actions/ticket";
-import { Ticket } from "@/types";
+import { getLaporanByKode } from "@/lib/actions/laporan";
+import { LaporanPublikDTO } from "@/types";
 import StatusBadge from "@/components/StatusBadge";
 import { formatDate } from "@/lib/utils";
 import { Search, MapPin, Calendar, MessageSquare, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
@@ -15,7 +15,7 @@ function CekTiketContent() {
 
   const [kodeTiket, setKodeTiket] = useState(initialKode);
   const [isLoading, setIsLoading] = useState(false);
-  const [ticketData, setTicketData] = useState<Ticket | null>(null);
+  const [ticketData, setTicketData] = useState<LaporanPublikDTO | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ function CekTiketContent() {
     setTicketData(null);
 
     try {
-      const res = await getTicketByCode(code);
+      const res = await getLaporanByKode(code);
       if (res.success && res.data) {
         setTicketData(res.data);
       } else {
@@ -116,52 +116,56 @@ function CekTiketContent() {
             <div>
               <span className="text-xs uppercase font-semibold text-slate-400">Kode Tiket</span>
               <div className="text-2xl font-bold font-mono text-emerald-600">
-                {ticketData.nomor_tiket}
+                {ticketData.kode_tiket}
               </div>
             </div>
             <div>
-              <StatusBadge status={ticketData.status} size="md" />
+              <StatusBadge status={ticketData.status_laporan} size="md" />
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
               <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 mb-2">
-                {ticketData.kategori}
+                {ticketData.nama_kategori}
               </span>
-              <h2 className="text-xl font-bold text-slate-900">{ticketData.judul}</h2>
+              <h2 className="text-xl font-bold text-slate-900">{ticketData.judul_laporan}</h2>
             </div>
 
             <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 p-4 rounded-xl border border-slate-100">
-              {ticketData.deskripsi}
+              {ticketData.deskripsi_laporan}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-600 pt-2">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>
-                  {ticketData.jorong ? `${ticketData.jorong} - ` : ""}
-                  {ticketData.lokasi}
+                  {ticketData.nama_jorong} - {ticketData.patokan_lokasi}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Dilaporkan pada {formatDate(ticketData.created_at)}</span>
+                <span>Dilaporkan pada {formatDate(ticketData.waktu_dibuat)}</span>
               </div>
             </div>
 
             {/* Lampiran Foto Bukti */}
-            {ticketData.lampiran_url && (
+            {ticketData.lampiran.length > 0 && (
               <div className="pt-2">
                 <span className="block text-xs font-semibold uppercase text-slate-400 mb-2">
                   Foto Bukti yang Dilampirkan
                 </span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={ticketData.lampiran_url}
-                  alt="Bukti Kejadian"
-                  className="max-h-60 rounded-xl object-cover border border-slate-200 shadow-sm"
-                />
+                <div className="flex flex-wrap gap-3">
+                  {ticketData.lampiran.map((l) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={l.id_lampiran}
+                      src={l.jalur_berkas}
+                      alt={l.nama_berkas}
+                      className="max-h-60 rounded-xl object-cover border border-slate-200 shadow-sm"
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -172,10 +176,21 @@ function CekTiketContent() {
               <MessageSquare className="w-4 h-4 text-emerald-600" />
               Tanggapan Resmi Aparatur Nagari
             </h3>
-            {ticketData.tanggapan ? (
-              <div className="bg-emerald-50/60 border border-emerald-100 p-4 rounded-xl text-sm text-emerald-900 leading-relaxed">
-                {ticketData.tanggapan}
-              </div>
+            {ticketData.riwayat.length > 0 ? (
+              <ol className="space-y-3">
+                {ticketData.riwayat.map((r, i) => (
+                  <li
+                    key={i}
+                    className="bg-emerald-50/60 border border-emerald-100 p-4 rounded-xl text-sm text-emerald-900 leading-relaxed space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <StatusBadge status={r.status_tahapan} size="sm" />
+                      <span className="text-xs text-emerald-700">{formatDate(r.waktu_pembaruan)}</span>
+                    </div>
+                    <p>{r.catatan_petugas}</p>
+                  </li>
+                ))}
+              </ol>
             ) : (
               <p className="text-xs text-slate-500 italic bg-slate-50 p-3.5 rounded-xl border border-slate-100">
                 Laporan ini sedang dalam antrean verifikasi Admin Nagari. Tanggapan dan instruksi tindak lanjut akan diperbarui di sini.

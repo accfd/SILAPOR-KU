@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAllTickets, updateTicketStatus } from "@/actions/ticket";
-import { Ticket, TicketStatus } from "@/types";
+import { getDaftarLaporan, getDetailLaporan } from "@/lib/actions/laporan";
+import { updateStatusLaporan } from "@/lib/actions/tindak-lanjut";
+import { ALUR_STATUS } from "@/lib/constants";
+import { LaporanDetailDTO, LaporanRingkasDTO, StatusLaporan } from "@/types";
 import StatusBadge from "@/components/StatusBadge";
 import Modal from "@/components/Modal";
 import { formatDate } from "@/lib/utils";
@@ -22,22 +24,24 @@ import {
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<LaporanRingkasDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<LaporanRingkasDTO | null>(null);
+  const [detail, setDetail] = useState<LaporanDetailDTO | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
   // Form update status
-  const [newStatus, setNewStatus] = useState<TicketStatus>("DIPROSES");
+  const [newStatus, setNewStatus] = useState<StatusLaporan>("diproses");
   const [tanggapanText, setTanggapanText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchTickets = async () => {
     setIsLoading(true);
     try {
-      const res = await getAllTickets(
-        filterStatus !== "ALL" ? { status: filterStatus as TicketStatus } : undefined
+      const res = await getDaftarLaporan(
+        filterStatus !== "ALL" ? { status_laporan: filterStatus as StatusLaporan } : undefined
       );
       if (res.success && res.data) {
         setTickets(res.data);
@@ -54,10 +58,19 @@ export default function AdminDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus]);
 
-  const handleOpenUpdate = (ticket: Ticket) => {
+  const handleOpenDetail = async (ticket: LaporanRingkasDTO) => {
     setSelectedTicket(ticket);
-    setNewStatus(ticket.status);
-    setTanggapanText(ticket.tanggapan || "");
+    setDetail(null);
+    const res = await getDetailLaporan(ticket.id_laporan);
+    if (res.success && res.data) setDetail(res.data);
+  };
+
+  const handleOpenUpdate = (ticket: LaporanRingkasDTO) => {
+    setSelectedTicket(ticket);
+    // Catatan baru ditambahkan ke riwayat (audit trail), bukan menimpa catatan lama.
+    setNewStatus(ALUR_STATUS[ticket.status_laporan][0] ?? ticket.status_laporan);
+    setTanggapanText("");
+    setSaveError(null);
     setIsUpdateModalOpen(true);
   };
 
@@ -66,21 +79,31 @@ export default function AdminDashboardPage() {
     if (!selectedTicket) return;
 
     setIsSaving(true);
+    setSaveError(null);
     try {
-      await updateTicketStatus(selectedTicket.id, newStatus, tanggapanText);
+      const res = await updateStatusLaporan({
+        id_laporan: selectedTicket.id_laporan,
+        status_tahapan: newStatus as "diproses" | "selesai" | "ditolak",
+        catatan_petugas: tanggapanText,
+      });
+      if (!res.success) {
+        setSaveError(res.message);
+        return;
+      }
       setIsUpdateModalOpen(false);
       setSelectedTicket(null);
       await fetchTickets();
     } catch (e) {
       console.error(e);
+      setSaveError("Terjadi gangguan jaringan saat menyimpan perubahan.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const countMenunggu = tickets.filter((t) => t.status === "MENUNGGU").length;
-  const countDiproses = tickets.filter((t) => t.status === "DIPROSES").length;
-  const countSelesai = tickets.filter((t) => t.status === "SELESAI").length;
+  const countMenunggu = tickets.filter((t) => t.status_laporan === "menunggu").length;
+  const countDiproses = tickets.filter((t) => t.status_laporan === "diproses").length;
+  const countSelesai = tickets.filter((t) => t.status_laporan === "selesai").length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -161,10 +184,10 @@ export default function AdminDashboardPage() {
               className="text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-200 bg-slate-50 outline-none"
             >
               <option value="ALL">Semua Status</option>
-              <option value="MENUNGGU">Menunggu Pemeriksaan</option>
-              <option value="DIPROSES">Sedang Diproses</option>
-              <option value="SELESAI">Selesai</option>
-              <option value="DITOLAK">Ditolak</option>
+              <option value="menunggu">Menunggu Pemeriksaan</option>
+              <option value="diproses">Sedang Diproses</option>
+              <option value="selesai">Selesai</option>
+              <option value="ditolak">Ditolak</option>
             </select>
           </div>
           <span className="text-xs text-slate-500 font-medium">
@@ -195,9 +218,9 @@ export default function AdminDashboardPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {tickets.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/70 transition">
+                  <tr key={t.id_laporan} className="hover:bg-slate-50/70 transition">
                     <td className="py-4 px-4 font-mono font-bold text-emerald-600">
-                      {t.nomor_tiket}
+                      {t.kode_tiket}
                     </td>
                     <td className="py-4 px-4">
                       <div className="font-medium text-slate-900">
@@ -207,22 +230,22 @@ export default function AdminDashboardPage() {
                           t.nama_pelapor || "Warga"
                         )}
                       </div>
-                      <div className="text-xs text-slate-400">{t.jorong || "Nagari Kambang Utara"}</div>
+                      <div className="text-xs text-slate-400">{t.nama_jorong}</div>
                     </td>
                     <td className="py-4 px-4 max-w-xs">
-                      <div className="font-semibold text-slate-900 truncate">{t.judul}</div>
-                      <div className="text-xs text-slate-500 truncate">{t.kategori}</div>
+                      <div className="font-semibold text-slate-900 truncate">{t.judul_laporan}</div>
+                      <div className="text-xs text-slate-500 truncate">{t.nama_kategori}</div>
                     </td>
                     <td className="py-4 px-4">
-                      <StatusBadge status={t.status} size="sm" />
+                      <StatusBadge status={t.status_laporan} size="sm" />
                     </td>
                     <td className="py-4 px-4 text-xs text-slate-500">
-                      {formatDate(t.created_at)}
+                      {formatDate(t.waktu_dibuat)}
                     </td>
                     <td className="py-4 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => setSelectedTicket(t)}
+                          onClick={() => handleOpenDetail(t)}
                           title="Lihat Detail & Foto Bukti"
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
                         >
@@ -230,8 +253,13 @@ export default function AdminDashboardPage() {
                         </button>
                         <button
                           onClick={() => handleOpenUpdate(t)}
-                          title="Tindak Lanjut & Ubah Status"
-                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition"
+                          disabled={ALUR_STATUS[t.status_laporan].length === 0}
+                          title={
+                            ALUR_STATUS[t.status_laporan].length === 0
+                              ? "Laporan sudah final dan tidak dapat diubah"
+                              : "Tindak Lanjut & Ubah Status"
+                          }
+                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -250,84 +278,109 @@ export default function AdminDashboardPage() {
         <Modal
           isOpen={!!selectedTicket}
           onClose={() => setSelectedTicket(null)}
-          title={`Detail Laporan: ${selectedTicket.nomor_tiket}`}
+          title={`Detail Laporan: ${selectedTicket.kode_tiket}`}
         >
-          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700">
-                {selectedTicket.kategori}
-              </span>
-              <StatusBadge status={selectedTicket.status} size="sm" />
+          {!detail ? (
+            <div className="py-12 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" /> Memuat detail laporan...
             </div>
-
-            <div>
-              <h4 className="text-lg font-bold text-slate-900">{selectedTicket.judul}</h4>
-              <p className="text-sm text-slate-600 mt-2 whitespace-pre-line bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                {selectedTicket.deskripsi}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 pt-1">
-              <div className="flex items-center gap-1.5">
-                <User className="w-4 h-4 text-slate-400" />
-                <span>
-                  Pelapor: {selectedTicket.is_anonim ? "Anonim (Dirahasiakan)" : selectedTicket.nama_pelapor || "Warga"}
+          ) : (
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700">
+                  {detail.nama_kategori}
                 </span>
+                <StatusBadge status={detail.status_laporan} size="sm" />
               </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                <span>{selectedTicket.lokasi}</span>
-              </div>
-              <div className="flex items-center gap-1.5 col-span-2">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span>Diajukan: {formatDate(selectedTicket.created_at)}</span>
-              </div>
-            </div>
 
-            {/* Foto Bukti Resolusi Penuh */}
-            {selectedTicket.lampiran_url && (
-              <div className="pt-2">
-                <span className="block text-xs font-semibold uppercase text-slate-400 mb-2">
-                  Foto Bukti Lapangan:
-                </span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={selectedTicket.lampiran_url}
-                  alt="Bukti Laporan"
-                  className="max-h-72 w-full rounded-xl object-contain bg-slate-950 p-1 border border-slate-200"
-                />
-              </div>
-            )}
-
-            {/* Tanggapan */}
-            {selectedTicket.tanggapan && (
-              <div className="pt-2">
-                <span className="block text-xs font-semibold uppercase text-slate-400 mb-1">
-                  Catatan Progres Saat Ini:
-                </span>
-                <p className="text-xs bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-100">
-                  {selectedTicket.tanggapan}
+              <div>
+                <h4 className="text-lg font-bold text-slate-900">{detail.judul_laporan}</h4>
+                <p className="text-sm text-slate-600 mt-2 whitespace-pre-line bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                  {detail.deskripsi_laporan}
                 </p>
               </div>
-            )}
 
-            <div className="pt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
-              >
-                Tutup
-              </button>
-              <button
-                onClick={() => {
-                  handleOpenUpdate(selectedTicket);
-                }}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition"
-              >
-                Tindak Lanjut Laporan Ini
-              </button>
+              <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 pt-1">
+                <div className="flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-slate-400" />
+                  <span>
+                    Pelapor: {detail.is_anonim ? "Anonim (Dirahasiakan)" : detail.nama_pelapor || "Warga"}
+                    {detail.nomor_kontak ? ` (${detail.nomor_kontak})` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-slate-400" />
+                  <span>
+                    {detail.nama_jorong} - {detail.patokan_lokasi}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 col-span-2">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <span>Diajukan: {formatDate(detail.waktu_dibuat)}</span>
+                </div>
+              </div>
+
+              {/* Foto Bukti Resolusi Penuh */}
+              {detail.lampiran.length > 0 && (
+                <div className="pt-2 space-y-2">
+                  <span className="block text-xs font-semibold uppercase text-slate-400">
+                    Foto Bukti Lapangan:
+                  </span>
+                  {detail.lampiran.map((l) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={l.id_lampiran}
+                      src={l.jalur_berkas}
+                      alt={l.nama_berkas}
+                      className="max-h-72 w-full rounded-xl object-contain bg-slate-950 p-1 border border-slate-200"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Riwayat Tindak Lanjut (Audit Trail) */}
+              {detail.riwayat.length > 0 && (
+                <div className="pt-2 space-y-2">
+                  <span className="block text-xs font-semibold uppercase text-slate-400">
+                    Riwayat Penanganan:
+                  </span>
+                  {detail.riwayat.map((r) => (
+                    <div
+                      key={r.id_tindak_lanjut}
+                      className="text-xs bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-100 space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <StatusBadge status={r.status_tahapan} size="sm" />
+                        <span>
+                          {r.nama_petugas} - {formatDate(r.waktu_pembaruan)}
+                        </span>
+                      </div>
+                      <p>{r.catatan_petugas}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => setSelectedTicket(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                >
+                  Tutup
+                </button>
+                {ALUR_STATUS[selectedTicket.status_laporan].length > 0 && (
+                  <button
+                    onClick={() => {
+                      handleOpenUpdate(selectedTicket);
+                    }}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition"
+                  >
+                    Tindak Lanjut Laporan Ini
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </Modal>
       )}
 
@@ -336,7 +389,7 @@ export default function AdminDashboardPage() {
         <Modal
           isOpen={isUpdateModalOpen}
           onClose={() => setIsUpdateModalOpen(false)}
-          title={`Tindak Lanjut Tiket: ${selectedTicket.nomor_tiket}`}
+          title={`Tindak Lanjut Tiket: ${selectedTicket.kode_tiket}`}
         >
           <form onSubmit={handleSaveUpdate} className="space-y-4">
             <div>
@@ -345,13 +398,22 @@ export default function AdminDashboardPage() {
               </label>
               <select
                 value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as TicketStatus)}
+                onChange={(e) => setNewStatus(e.target.value as StatusLaporan)}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
               >
-                <option value="MENUNGGU">Menunggu Pemeriksaan</option>
-                <option value="DIPROSES">Sedang Diproses (Instruksi Lapangan)</option>
-                <option value="SELESAI">Selesai (Penanganan Tuntas)</option>
-                <option value="DITOLAK">Tolak Laporan (Tidak Valid / Fiktif)</option>
+                {ALUR_STATUS[selectedTicket.status_laporan].includes("diproses") && (
+                  <option value="diproses">
+                    {selectedTicket.status_laporan === "diproses"
+                      ? "Tetap Diproses (Tambah Catatan Progres)"
+                      : "Sedang Diproses (Instruksi Lapangan)"}
+                  </option>
+                )}
+                {ALUR_STATUS[selectedTicket.status_laporan].includes("selesai") && (
+                  <option value="selesai">Selesai (Penanganan Tuntas)</option>
+                )}
+                {ALUR_STATUS[selectedTicket.status_laporan].includes("ditolak") && (
+                  <option value="ditolak">Tolak Laporan (Tidak Valid / Fiktif)</option>
+                )}
               </select>
             </div>
 
@@ -368,6 +430,12 @@ export default function AdminDashboardPage() {
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
+
+            {saveError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                {saveError}
+              </div>
+            )}
 
             <div className="pt-2 flex items-center justify-end gap-2">
               <button

@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { loginStaff } from "@/actions/auth";
+import { loginAparatur } from "@/lib/actions/auth";
 import { ShieldAlert, Lock, Mail, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -20,18 +20,18 @@ export default function AdminLoginPage() {
 
     try {
       const formData = new FormData();
-      formData.append("email", email);
+      formData.append("username", username);
       formData.append("password", password);
 
-      const res = await loginStaff(formData);
-      if (res.success && res.data?.user) {
-        if (res.data.user.role === "WALI_NAGARI") {
+      const res = await loginAparatur(formData);
+      if (res.success && res.data?.aparatur) {
+        if (res.data.aparatur.peran === "wali_nagari") {
           router.push("/wali-nagari/dashboard");
         } else {
           router.push("/admin/dashboard");
         }
       } else {
-        setErrorMessage(res.message || "Email atau kata sandi tidak valid.");
+        setErrorMessage(res.message || "Username atau kata sandi tidak valid.");
       }
     } catch {
       setErrorMessage("Terjadi kesalahan koneksi saat memproses login.");
@@ -65,15 +65,16 @@ export default function AdminLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Email Resmi
+              Username
             </label>
             <div className="relative">
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@kambangutara.desa.id"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username aparatur"
                 className="w-full px-4 py-2.5 pl-10 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
               />
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />

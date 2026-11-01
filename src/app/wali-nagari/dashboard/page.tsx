@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAllTickets } from "@/actions/ticket";
-import { Ticket } from "@/types";
+import { getDaftarLaporan, getDetailLaporan } from "@/lib/actions/laporan";
+import { LaporanDetailDTO, LaporanRingkasDTO } from "@/types";
 import StatusBadge from "@/components/StatusBadge";
 import Modal from "@/components/Modal";
 import { formatDate } from "@/lib/utils";
@@ -22,14 +22,15 @@ import {
 } from "lucide-react";
 
 export default function WaliNagariDashboardPage() {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<LaporanRingkasDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<LaporanRingkasDTO | null>(null);
+  const [detail, setDetail] = useState<LaporanDetailDTO | null>(null);
 
   const fetchTickets = async () => {
     setIsLoading(true);
     try {
-      const res = await getAllTickets();
+      const res = await getDaftarLaporan();
       if (res.success && res.data) {
         setTickets(res.data);
       }
@@ -44,24 +45,31 @@ export default function WaliNagariDashboardPage() {
     fetchTickets();
   }, []);
 
+  const handleOpenDetail = async (ticket: LaporanRingkasDTO) => {
+    setSelectedTicket(ticket);
+    setDetail(null);
+    const res = await getDetailLaporan(ticket.id_laporan);
+    if (res.success && res.data) setDetail(res.data);
+  };
+
   const total = tickets.length;
-  const selesai = tickets.filter((t) => t.status === "SELESAI").length;
-  const diproses = tickets.filter((t) => t.status === "DIPROSES").length;
-  const menunggu = tickets.filter((t) => t.status === "MENUNGGU").length;
-  const ditolak = tickets.filter((t) => t.status === "DITOLAK").length;
+  const selesai = tickets.filter((t) => t.status_laporan === "selesai").length;
+  const diproses = tickets.filter((t) => t.status_laporan === "diproses").length;
+  const menunggu = tickets.filter((t) => t.status_laporan === "menunggu").length;
+  const ditolak = tickets.filter((t) => t.status_laporan === "ditolak").length;
 
   const completionRate = total > 0 ? Math.round((selesai / total) * 100) : 0;
 
   // Sebaran per jorong
   const jorongCounts = tickets.reduce((acc, t) => {
-    const key = t.jorong || "Lainnya";
+    const key = t.nama_jorong || "Lainnya";
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   // Sebaran per kategori
   const kategoriCounts = tickets.reduce((acc, t) => {
-    const key = t.kategori || "Umum";
+    const key = t.nama_kategori || "Umum";
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -227,26 +235,26 @@ export default function WaliNagariDashboardPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {tickets.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/70 transition">
+                  <tr key={t.id_laporan} className="hover:bg-slate-50/70 transition">
                     <td className="py-4 px-4 font-mono font-bold text-emerald-600">
-                      {t.nomor_tiket}
+                      {t.kode_tiket}
                     </td>
                     <td className="py-4 px-4">
-                      <div className="font-medium text-slate-900">{t.jorong || "Nagari Kambang Utara"}</div>
+                      <div className="font-medium text-slate-900">{t.nama_jorong}</div>
                       <div className="text-xs text-slate-400">
                         {t.is_anonim ? "Anonim" : t.nama_pelapor || "Warga"}
                       </div>
                     </td>
                     <td className="py-4 px-4 max-w-xs font-medium text-slate-900 truncate">
-                      {t.judul}
+                      {t.judul_laporan}
                     </td>
                     <td className="py-4 px-4">
-                      <StatusBadge status={t.status} size="sm" />
+                      <StatusBadge status={t.status_laporan} size="sm" />
                     </td>
-                    <td className="py-4 px-4 text-xs text-slate-500">{formatDate(t.created_at)}</td>
+                    <td className="py-4 px-4 text-xs text-slate-500">{formatDate(t.waktu_dibuat)}</td>
                     <td className="py-4 px-4 text-center">
                       <button
-                        onClick={() => setSelectedTicket(t)}
+                        onClick={() => handleOpenDetail(t)}
                         title="Buka Detail Laporan"
                         className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
                       >
@@ -266,78 +274,100 @@ export default function WaliNagariDashboardPage() {
         <Modal
           isOpen={!!selectedTicket}
           onClose={() => setSelectedTicket(null)}
-          title={`Peninjauan Eksekutif: ${selectedTicket.nomor_tiket}`}
+          title={`Peninjauan Eksekutif: ${selectedTicket.kode_tiket}`}
         >
-          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700">
-                {selectedTicket.kategori}
-              </span>
-              <StatusBadge status={selectedTicket.status} size="sm" />
+          {!detail ? (
+            <div className="py-12 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" /> Memuat detail laporan...
             </div>
-
-            <div>
-              <h4 className="text-lg font-bold text-slate-900">{selectedTicket.judul}</h4>
-              <p className="text-sm text-slate-600 mt-2 whitespace-pre-line bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                {selectedTicket.deskripsi}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 pt-1">
-              <div className="flex items-center gap-1.5">
-                <User className="w-4 h-4 text-slate-400" />
-                <span>
-                  Pelapor: {selectedTicket.is_anonim ? "Anonim (Dirahasiakan)" : selectedTicket.nama_pelapor || "Warga"}
+          ) : (
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700">
+                  {detail.nama_kategori}
                 </span>
+                <StatusBadge status={detail.status_laporan} size="sm" />
               </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                <span>{selectedTicket.lokasi}</span>
-              </div>
-              <div className="flex items-center gap-1.5 col-span-2">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span>Diajukan: {formatDate(selectedTicket.created_at)}</span>
-              </div>
-            </div>
 
-            {/* Foto Bukti */}
-            {selectedTicket.lampiran_url && (
-              <div className="pt-2">
-                <span className="block text-xs font-semibold uppercase text-slate-400 mb-2">
-                  Foto Bukti yang Ditinjau:
-                </span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={selectedTicket.lampiran_url}
-                  alt="Bukti Laporan"
-                  className="max-h-72 w-full rounded-xl object-contain bg-slate-950 p-1 border border-slate-200"
-                />
-              </div>
-            )}
-
-            {/* Tanggapan Resmi */}
-            {selectedTicket.tanggapan ? (
-              <div className="pt-2">
-                <span className="block text-xs font-semibold uppercase text-slate-400 mb-1">
-                  Catatan Progres dari Aparatur:
-                </span>
-                <p className="text-xs bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-100">
-                  {selectedTicket.tanggapan}
+              <div>
+                <h4 className="text-lg font-bold text-slate-900">{detail.judul_laporan}</h4>
+                <p className="text-sm text-slate-600 mt-2 whitespace-pre-line bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                  {detail.deskripsi_laporan}
                 </p>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400 italic">Belum ada catatan tindak lanjut dari admin.</p>
-            )}
 
-            <div className="pt-4 flex justify-end">
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
-              >
-                Tutup Pratinjau
-              </button>
+              <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 pt-1">
+                <div className="flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-slate-400" />
+                  <span>
+                    Pelapor: {detail.is_anonim ? "Anonim (Dirahasiakan)" : detail.nama_pelapor || "Warga"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-slate-400" />
+                  <span>
+                    {detail.nama_jorong} - {detail.patokan_lokasi}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 col-span-2">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <span>Diajukan: {formatDate(detail.waktu_dibuat)}</span>
+                </div>
+              </div>
+
+              {/* Foto Bukti */}
+              {detail.lampiran.length > 0 && (
+                <div className="pt-2 space-y-2">
+                  <span className="block text-xs font-semibold uppercase text-slate-400">
+                    Foto Bukti yang Ditinjau:
+                  </span>
+                  {detail.lampiran.map((l) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={l.id_lampiran}
+                      src={l.jalur_berkas}
+                      alt={l.nama_berkas}
+                      className="max-h-72 w-full rounded-xl object-contain bg-slate-950 p-1 border border-slate-200"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Riwayat Penanganan */}
+              {detail.riwayat.length > 0 ? (
+                <div className="pt-2 space-y-2">
+                  <span className="block text-xs font-semibold uppercase text-slate-400">
+                    Catatan Progres dari Aparatur:
+                  </span>
+                  {detail.riwayat.map((r) => (
+                    <div
+                      key={r.id_tindak_lanjut}
+                      className="text-xs bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-100 space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <StatusBadge status={r.status_tahapan} size="sm" />
+                        <span>
+                          {r.nama_petugas} - {formatDate(r.waktu_pembaruan)}
+                        </span>
+                      </div>
+                      <p>{r.catatan_petugas}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Belum ada catatan tindak lanjut dari admin.</p>
+              )}
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  onClick={() => setSelectedTicket(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                >
+                  Tutup Pratinjau
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </Modal>
       )}
     </div>
