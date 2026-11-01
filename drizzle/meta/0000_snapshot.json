@@ -1,0 +1,619 @@
+{
+  "id": "67348724-339f-4dfc-bfbc-5a4291cbf6f1",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.aparatur": {
+      "name": "aparatur",
+      "schema": "",
+      "columns": {
+        "id_aparatur": {
+          "name": "id_aparatur",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nama_lengkap": {
+          "name": "nama_lengkap",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "peran": {
+          "name": "peran",
+          "type": "peran_aparatur",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "aparatur_username_unique": {
+          "name": "aparatur_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.jorong": {
+      "name": "jorong",
+      "schema": "",
+      "columns": {
+        "id_jorong": {
+          "name": "id_jorong",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama_jorong": {
+          "name": "nama_jorong",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "jorong_nama_jorong_unique": {
+          "name": "jorong_nama_jorong_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nama_jorong"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kategori": {
+      "name": "kategori",
+      "schema": "",
+      "columns": {
+        "id_kategori": {
+          "name": "id_kategori",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama_kategori": {
+          "name": "nama_kategori",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deskripsi_kategori": {
+          "name": "deskripsi_kategori",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "kategori_nama_kategori_unique": {
+          "name": "kategori_nama_kategori_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nama_kategori"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lampiran": {
+      "name": "lampiran",
+      "schema": "",
+      "columns": {
+        "id_lampiran": {
+          "name": "id_lampiran",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "id_laporan": {
+          "name": "id_laporan",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nama_berkas": {
+          "name": "nama_berkas",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jalur_berkas": {
+          "name": "jalur_berkas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipe_berkas": {
+          "name": "tipe_berkas",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ukuran_berkas": {
+          "name": "ukuran_berkas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "waktu_unggah": {
+          "name": "waktu_unggah",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "lampiran_laporan_idx": {
+          "name": "lampiran_laporan_idx",
+          "columns": [
+            {
+              "expression": "id_laporan",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "lampiran_id_laporan_laporan_id_laporan_fk": {
+          "name": "lampiran_id_laporan_laporan_id_laporan_fk",
+          "tableFrom": "lampiran",
+          "tableTo": "laporan",
+          "columnsFrom": [
+            "id_laporan"
+          ],
+          "columnsTo": [
+            "id_laporan"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "lampiran_tipe_gambar": {
+          "name": "lampiran_tipe_gambar",
+          "value": "\"lampiran\".\"tipe_berkas\" in ('image/jpeg', 'image/png', 'image/webp')"
+        },
+        "lampiran_ukuran_valid": {
+          "name": "lampiran_ukuran_valid",
+          "value": "\"lampiran\".\"ukuran_berkas\" > 0 and \"lampiran\".\"ukuran_berkas\" <= 5242880"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.laporan": {
+      "name": "laporan",
+      "schema": "",
+      "columns": {
+        "id_laporan": {
+          "name": "id_laporan",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kode_tiket": {
+          "name": "kode_tiket",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_pelapor": {
+          "name": "id_pelapor",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_jorong": {
+          "name": "id_jorong",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_kategori": {
+          "name": "id_kategori",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis_laporan": {
+          "name": "jenis_laporan",
+          "type": "jenis_laporan",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pengaduan'"
+        },
+        "judul_laporan": {
+          "name": "judul_laporan",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deskripsi_laporan": {
+          "name": "deskripsi_laporan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "koordinat_lintang": {
+          "name": "koordinat_lintang",
+          "type": "numeric(9, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "koordinat_bujur": {
+          "name": "koordinat_bujur",
+          "type": "numeric(9, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "patokan_lokasi": {
+          "name": "patokan_lokasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status_laporan": {
+          "name": "status_laporan",
+          "type": "status_laporan",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'menunggu'"
+        },
+        "waktu_dibuat": {
+          "name": "waktu_dibuat",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "waktu_selesai": {
+          "name": "waktu_selesai",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "laporan_status_idx": {
+          "name": "laporan_status_idx",
+          "columns": [
+            {
+              "expression": "status_laporan",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "laporan_waktu_dibuat_idx": {
+          "name": "laporan_waktu_dibuat_idx",
+          "columns": [
+            {
+              "expression": "waktu_dibuat",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "laporan_jorong_idx": {
+          "name": "laporan_jorong_idx",
+          "columns": [
+            {
+              "expression": "id_jorong",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "laporan_kategori_idx": {
+          "name": "laporan_kategori_idx",
+          "columns": [
+            {
+              "expression": "id_kategori",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "laporan_id_pelapor_pelapor_id_pelapor_fk": {
+          "name": "laporan_id_pelapor_pelapor_id_pelapor_fk",
+          "tableFrom": "laporan",
+          "tableTo": "pelapor",
+          "columnsFrom": [
+            "id_pelapor"
+          ],
+          "columnsTo": [
+            "id_pelapor"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "laporan_id_jorong_jorong_id_jorong_fk": {
+          "name": "laporan_id_jorong_jorong_id_jorong_fk",
+          "tableFrom": "laporan",
+          "tableTo": "jorong",
+          "columnsFrom": [
+            "id_jorong"
+          ],
+          "columnsTo": [
+            "id_jorong"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "laporan_id_kategori_kategori_id_kategori_fk": {
+          "name": "laporan_id_kategori_kategori_id_kategori_fk",
+          "tableFrom": "laporan",
+          "tableTo": "kategori",
+          "columnsFrom": [
+            "id_kategori"
+          ],
+          "columnsTo": [
+            "id_kategori"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "laporan_kode_tiket_unique": {
+          "name": "laporan_kode_tiket_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "kode_tiket"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "laporan_koordinat_valid": {
+          "name": "laporan_koordinat_valid",
+          "value": "(\"laporan\".\"koordinat_lintang\" is null) = (\"laporan\".\"koordinat_bujur\" is null)\n        and (\"laporan\".\"koordinat_lintang\" is null or \"laporan\".\"koordinat_lintang\" between -90 and 90)\n        and (\"laporan\".\"koordinat_bujur\" is null or \"laporan\".\"koordinat_bujur\" between -180 and 180)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pelapor": {
+      "name": "pelapor",
+      "schema": "",
+      "columns": {
+        "id_pelapor": {
+          "name": "id_pelapor",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama_pelapor": {
+          "name": "nama_pelapor",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nomor_kontak": {
+          "name": "nomor_kontak",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_anonim": {
+          "name": "is_anonim",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tindak_lanjut": {
+      "name": "tindak_lanjut",
+      "schema": "",
+      "columns": {
+        "id_tindak_lanjut": {
+          "name": "id_tindak_lanjut",
+          "type": "varchar(36)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "id_laporan": {
+          "name": "id_laporan",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_aparatur": {
+          "name": "id_aparatur",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status_tahapan": {
+          "name": "status_tahapan",
+          "type": "status_laporan",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catatan_petugas": {
+          "name": "catatan_petugas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "waktu_pembaruan": {
+          "name": "waktu_pembaruan",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "tindak_lanjut_laporan_idx": {
+          "name": "tindak_lanjut_laporan_idx",
+          "columns": [
+            {
+              "expression": "id_laporan",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "waktu_pembaruan",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tindak_lanjut_id_laporan_laporan_id_laporan_fk": {
+          "name": "tindak_lanjut_id_laporan_laporan_id_laporan_fk",
+          "tableFrom": "tindak_lanjut",
+          "tableTo": "laporan",
+          "columnsFrom": [
+            "id_laporan"
+          ],
+          "columnsTo": [
+            "id_laporan"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tindak_lanjut_id_aparatur_aparatur_id_aparatur_fk": {
+          "name": "tindak_lanjut_id_aparatur_aparatur_id_aparatur_fk",
+          "tableFrom": "tindak_lanjut",
+          "tableTo": "aparatur",
+          "columnsFrom": [
+            "id_aparatur"
+          ],
+          "columnsTo": [
+            "id_aparatur"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.jenis_laporan": {
+      "name": "jenis_laporan",
+      "schema": "public",
+      "values": [
+        "pengaduan",
+        "aspirasi"
+      ]
+    },
+    "public.peran_aparatur": {
+      "name": "peran_aparatur",
+      "schema": "public",
+      "values": [
+        "admin",
+        "wali_nagari"
+      ]
+    },
+    "public.status_laporan": {
+      "name": "status_laporan",
+      "schema": "public",
+      "values": [
+        "menunggu",
+        "diproses",
+        "selesai",
+        "ditolak"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

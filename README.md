@@ -359,6 +359,9 @@ npx drizzle-kit push
 
 # Opsi 2: Buka Drizzle Studio (GUI Browser untuk melihat data)
 npx drizzle-kit studio
+
+# Isi data awal: jorong, kategori, dan akun aparatur (admin & walinagari)
+npm run db:seed
 ```
 
 ### Menjalankan Server Pengembangan
@@ -384,6 +387,7 @@ Buka peramban Anda di [http://localhost:3000](http://localhost:3000) untuk menga
 | `npx drizzle-kit push` | Menerapkan perubahan skema `schema.ts` langsung ke database Neon. |
 | `npx drizzle-kit generate` | Menghasilkan berkas migrasi SQL statis di folder `drizzle/`. |
 | `npx drizzle-kit studio` | Membuka antarmuka web visual untuk mengelola database lokal/cloud. |
+| `npm run db:seed` | Mengisi jorong, kategori, dan akun aparatur awal (idempoten; kata sandi dari `SEED_*_PASSWORD` atau acak). |
 
 ---
 

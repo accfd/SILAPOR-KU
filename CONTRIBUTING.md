@@ -33,17 +33,22 @@ Salin file template `.env.example` menjadi `.env`:
 ```bash
 cp .env.example .env
 ```
-Buka file `.env` dan sesuaikan connection string Neon PostgreSQL:
+Buka file `.env` dan sesuaikan connection string Neon PostgreSQL serta kunci sesi:
 ```env
 DATABASE_URL="postgresql://[user]:[password]@[neon_host]/[dbname]?sslmode=require"
+SESSION_SECRET="string-acak-minimal-32-karakter"   # openssl rand -base64 32
 ```
 
-### 4. Sinkronisasi Skema Database (Prisma)
-Generate Prisma Client dan dorong skema awal ke database Neon:
+### 4. Sinkronisasi Skema Database (Drizzle)
+Dorong skema (`src/db/schema.ts`) ke database Neon, lalu isi data awal (jorong, kategori, akun aparatur):
 ```bash
-npx prisma generate
 npm run db:push
+npm run db:seed
 ```
+`db:seed` mencetak kata sandi sementara akun `admin` dan `walinagari` **sekali saja** (atau pakai
+`SEED_ADMIN_PASSWORD` / `SEED_WALI_PASSWORD` di `.env`). Setelah mengubah skema, buat berkas migrasi dengan
+`npm run db:generate` dan commit folder `drizzle/`.
+
 *(Opsional) Untuk melihat data tabel secara visual di browser:*
 ```bash
 npm run db:studio
@@ -87,9 +92,9 @@ git push -u origin feat/frontend-ui
 
 ### B. Alur Kerja Tim Backend (Lutfi & Dea)
 Fokus pengerjaan backend, integrasi database, dan pengujian:
-* Setup & relasi database Neon PostgreSQL di `prisma/schema.prisma`
-* Logika Server Actions (`src/actions/ticket.ts` & `src/actions/auth.ts`)
-* Hashing password kredensial staf & otentikasi sesi/cookie
+* Setup & relasi database Neon PostgreSQL di `src/db/schema.ts` (Drizzle ORM)
+* Logika Server Actions di `src/lib/actions/` (`laporan.ts`, `tindak-lanjut.ts`, `auth.ts`)
+* Hashing password kredensial staf (bcrypt) & otentikasi sesi/cookie (`src/lib/auth.ts`, `src/lib/session.ts`)
 * Verifikasi fungsi & pengujian sistem (Quality Assurance)
 
 ```bash
@@ -127,11 +132,11 @@ git push -u origin feat/backend-logic
 ```text
 SILAPOR-KU/
 ├── docs/                 # Dokumen PRD, BPMN, dan spesifikasi perancangan
-├── prisma/               # Konfigurasi ORM & Skema Database Neon
-│   └── schema.prisma     # Model User & Ticket
+├── drizzle/              # Migrasi SQL hasil drizzle-kit (di-commit)
+├── drizzle.config.ts     # Konfigurasi Drizzle Kit
 ├── public/               # Asset statis publik (favicon, icon, dsb)
 ├── src/
-│   ├── actions/          # Next.js Server Actions (ticket.ts, auth.ts)
+│   ├── db/               # Koneksi Neon (index.ts), skema 7 tabel (schema.ts), seed.ts
 │   ├── app/              # Next.js App Router (Routing halaman)
 │   │   ├── admin/        # /admin/login & /admin/dashboard
 │   │   ├── cek-tiket/    # /cek-tiket (Lacak laporan mandiri)
@@ -140,8 +145,9 @@ SILAPOR-KU/
 │   │   ├── layout.tsx    # Layout induk aplikasi (Navbar & Footer)
 │   │   └── page.tsx      # Beranda utama
 │   ├── components/       # Komponen reusable UI (Navbar, Footer, Modal, StatusBadge, Card)
-│   ├── lib/              # Prisma client singleton, utils & formatters
-│   └── types/            # Tipe antarmuka TypeScript
+│   ├── lib/              # actions/ (Server Actions), auth.ts, session.ts, validations.ts (Zod), utils.ts
+│   ├── proxy.ts          # Pengarah akses halaman aparatur (cek cookie sesi)
+│   └── types/            # Tipe antarmuka & kontrak DTO TypeScript
 ├── .env.example          # Panduan variabel lingkungan
 ├── CONTRIBUTING.md       # Pedoman Git dan alur kolaborasi tim (file ini)
 ├── package.json          # Manajemen dependensi dan skrip proyek
