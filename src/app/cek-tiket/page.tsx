@@ -1,202 +1,275 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { getLaporanByKode } from "@/lib/actions/laporan";
-import { LaporanPublikDTO } from "@/types";
-import StatusBadge from "@/components/StatusBadge";
-import { formatDate } from "@/lib/utils";
-import { Search, MapPin, Calendar, MessageSquare, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  MapPin,
+  MessageSquare,
+  Printer,
+  Search,
+  Share2,
+} from "lucide-react";
+import StatusBadge from "@/components/StatusBadge";
+import { getLaporanByKode } from "@/lib/actions/laporan";
+import { formatDate } from "@/lib/utils";
+import type { LaporanPublikDTO } from "@/types";
 
 function CekTiketContent() {
   const searchParams = useSearchParams();
-  const initialKode = searchParams.get("kode") || "";
-
-  const [kodeTiket, setKodeTiket] = useState(initialKode);
-  const [isLoading, setIsLoading] = useState(false);
+  const initialKode = searchParams.get("kode") ?? "";
+  const [kodeTiket, setKodeTiket] = useState(initialKode.toUpperCase());
+  const [isLoading, setIsLoading] = useState(Boolean(initialKode));
   const [ticketData, setTicketData] = useState<LaporanPublikDTO | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialKode) {
-      handleSearch(initialKode);
-    }
+    if (!initialKode) return;
+    let active = true;
+    getLaporanByKode(initialKode)
+      .then((result) => {
+        if (!active) return;
+        if (result.success && result.data) {
+          setTicketData(result.data);
+          setKodeTiket(result.data.kode_tiket);
+          setErrorMessage(null);
+        } else {
+          setTicketData(null);
+          setErrorMessage(result.message || "Tiket tidak ditemukan. Periksa kembali kode tiket Anda.");
+        }
+      })
+      .catch(() => {
+        if (active) setErrorMessage("Pelacakan gagal dimuat karena gangguan jaringan. Silakan coba kembali.");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [initialKode]);
 
-  const handleSearch = async (kodeToSearch?: string) => {
-    const code = (kodeToSearch || kodeTiket).trim();
+  const handleSearch = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = kodeTiket.trim();
     if (!code) {
-      setErrorMessage("Silakan masukkan kode tiket terlebih dahulu.");
+      setErrorMessage("Masukkan kode tiket terlebih dahulu.");
       return;
     }
 
     setIsLoading(true);
     setErrorMessage(null);
     setTicketData(null);
-
     try {
-      const res = await getLaporanByKode(code);
-      if (res.success && res.data) {
-        setTicketData(res.data);
-      } else {
-        setErrorMessage(res.message || "Tiket tidak ditemukan. Pastikan format kode tiket sudah benar.");
-      }
+      const result = await getLaporanByKode(code);
+      if (result.success && result.data) setTicketData(result.data);
+      else setErrorMessage(result.message || "Tiket tidak ditemukan. Periksa kembali kode tiket Anda.");
     } catch {
-      setErrorMessage("Gagal menghubungkan ke server pelacakan tiket.");
+      setErrorMessage("Pelacakan gagal dimuat karena gangguan jaringan. Silakan coba kembali.");
     } finally {
       setIsLoading(false);
+    }
+  }, [kodeTiket]);
+
+  const handleShare = async () => {
+    if (!ticketData) return;
+    const url = `${window.location.origin}/cek-tiket?kode=${encodeURIComponent(ticketData.kode_tiket)}`;
+    setShareMessage(null);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Lacak laporan SILAPOR-KU", url });
+        setShareMessage("Tautan pelacakan siap dibagikan.");
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMessage("Tautan pelacakan berhasil disalin.");
+      }
+    } catch {
+      setShareMessage("Tautan tidak dapat dibagikan otomatis. Salin alamat halaman ini untuk membagikannya.");
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Kembali ke Beranda
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <Link href="/" className="no-print inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-900">
+        <ArrowLeft className="h-4 w-4" />
+        Kembali ke beranda
       </Link>
 
-      {/* Header & Search Bar */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6">
-        <div className="text-center max-w-xl mx-auto space-y-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-600">
-            <Search className="w-4 h-4" />
-            Pelacakan Mandiri
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-800">
+            <Search className="h-4 w-4" />
+            Pelacakan mandiri
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Lacak Status Laporan
-          </h1>
-          <p className="text-sm text-slate-500">
-            Masukkan kode tiket yang Anda peroleh saat mengirim laporan untuk melihat progres penanganannya.
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Lacak status laporan</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            Masukkan kode tiket yang Anda terima setelah mengirim laporan.
           </p>
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSearch();
-          }}
-          className="flex flex-col sm:flex-row gap-3"
-        >
+        <form onSubmit={handleSearch} className="no-print mx-auto mt-6 flex max-w-3xl flex-col gap-3 sm:flex-row">
+          <label htmlFor="kode-tiket" className="sr-only">Kode tiket</label>
           <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
             <input
+              id="kode-tiket"
               type="text"
+              required
+              autoComplete="off"
+              spellCheck={false}
               value={kodeTiket}
-              onChange={(e) => setKodeTiket(e.target.value.toUpperCase())}
+              onChange={(event) => setKodeTiket(event.target.value.toUpperCase())}
               placeholder="Contoh: SLP-202610-ABCD"
-              className="w-full px-4 py-3.5 pl-11 rounded-xl border border-slate-300 font-mono text-sm uppercase tracking-wider focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              className="w-full rounded-xl border border-slate-300 py-3.5 pl-11 pr-4 font-mono text-sm uppercase tracking-wider focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             />
-            <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
           </div>
           <button
             type="submit"
             disabled={isLoading}
-            className="py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 text-sm"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cari Tiket"}
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {isLoading ? "Mencari..." : "Cari laporan"}
           </button>
         </form>
-      </div>
+      </section>
 
-      {/* Pesan Error */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <span>{errorMessage}</span>
+        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p>{errorMessage}</p>
         </div>
       )}
 
-      {/* Detail Hasil Pencarian Tiket */}
       {ticketData && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-md space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-            <div>
-              <span className="text-xs uppercase font-semibold text-slate-400">Kode Tiket</span>
-              <div className="text-2xl font-bold font-mono text-emerald-600">
-                {ticketData.kode_tiket}
+        <div className="print-area grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
+          <section className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kode tiket</span>
+                <p className="mt-1 break-all font-mono text-xl font-bold tracking-wider text-emerald-800 sm:text-2xl">
+                  {ticketData.kode_tiket}
+                </p>
               </div>
-            </div>
-            <div>
               <StatusBadge status={ticketData.status_laporan} size="md" />
             </div>
-          </div>
 
-          <div className="space-y-4">
             <div>
-              <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 mb-2">
-                {ticketData.nama_kategori}
-              </span>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                  {ticketData.nama_kategori}
+                </span>
+                <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold capitalize text-emerald-900">
+                  {ticketData.jenis_laporan}
+                </span>
+              </div>
               <h2 className="text-xl font-bold text-slate-900">{ticketData.judul_laporan}</h2>
+              <p className="mt-4 whitespace-pre-line rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
+                {ticketData.deskripsi_laporan}
+              </p>
             </div>
 
-            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 p-4 rounded-xl border border-slate-100">
-              {ticketData.deskripsi_laporan}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-600 pt-2">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  {ticketData.nama_jorong} - {ticketData.patokan_lokasi}
-                </span>
+            <div className="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+              <div className="flex items-start gap-2.5 text-sm text-slate-700">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-800" />
+                <span><strong className="block text-xs text-slate-500">Lokasi</strong>{ticketData.nama_jorong} · {ticketData.patokan_lokasi}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Dilaporkan pada {formatDate(ticketData.waktu_dibuat)}</span>
+              <div className="flex items-start gap-2.5 text-sm text-slate-700">
+                <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-emerald-800" />
+                <span><strong className="block text-xs text-slate-500">Tanggal laporan</strong>{formatDate(ticketData.waktu_dibuat)}</span>
               </div>
             </div>
 
-            {/* Lampiran Foto Bukti */}
             {ticketData.lampiran.length > 0 && (
-              <div className="pt-2">
-                <span className="block text-xs font-semibold uppercase text-slate-400 mb-2">
-                  Foto Bukti yang Dilampirkan
-                </span>
-                <div className="flex flex-wrap gap-3">
-                  {ticketData.lampiran.map((l) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={l.id_lampiran}
-                      src={l.jalur_berkas}
-                      alt={l.nama_berkas}
-                      className="max-h-60 rounded-xl object-cover border border-slate-200 shadow-sm"
-                    />
+              <div className="border-t border-slate-100 pt-4">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Foto bukti</h3>
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {ticketData.lampiran.map((foto) => (
+                    <li key={foto.id_lampiran} className="overflow-hidden rounded-xl border border-slate-200">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={foto.jalur_berkas} alt={foto.nama_berkas} className="h-36 w-full object-cover" />
+                      <p className="truncate px-2 py-1.5 text-xs text-slate-500">{foto.nama_berkas}</p>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
-          </div>
 
-          {/* Tanggapan Resmi Aparatur Nagari */}
-          <div className="pt-6 border-t border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
-              <MessageSquare className="w-4 h-4 text-emerald-600" />
-              Tanggapan Resmi Aparatur Nagari
-            </h3>
-            {ticketData.riwayat.length > 0 ? (
-              <ol className="space-y-3">
-                {ticketData.riwayat.map((r, i) => (
-                  <li
-                    key={i}
-                    className="bg-emerald-50/60 border border-emerald-100 p-4 rounded-xl text-sm text-emerald-900 leading-relaxed space-y-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <StatusBadge status={r.status_tahapan} size="sm" />
-                      <span className="text-xs text-emerald-700">{formatDate(r.waktu_pembaruan)}</span>
+            <div className="no-print flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Printer className="h-4 w-4" /> Cetak ringkasan
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Share2 className="h-4 w-4" /> Bagikan tautan
+              </button>
+              {shareMessage && <span role="status" className="self-center text-xs text-slate-600">{shareMessage}</span>}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <MessageSquare className="h-4 w-4 text-emerald-800" />
+              Riwayat dan tindak lanjut
+            </h2>
+            <ol className="mt-5 space-y-0">
+              <li className="relative flex gap-3 pb-5">
+                <span className="absolute bottom-0 left-[11px] top-6 w-px bg-slate-200" aria-hidden="true" />
+                <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-white">
+                  <CheckCircle2 className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-900">Laporan diterima</span>
+                    <time className="text-xs text-slate-500">{formatDate(ticketData.waktu_dibuat)}</time>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">Laporan tercatat dalam sistem SILAPOR-KU.</p>
+                </div>
+              </li>
+              {ticketData.riwayat.map((riwayat, index) => {
+                const isLatest = index === ticketData.riwayat.length - 1;
+                return (
+                  <li key={`${riwayat.waktu_pembaruan}-${index}`} className="relative flex gap-3 pb-5 last:pb-0">
+                    {!isLatest && <span className="absolute bottom-0 left-[11px] top-6 w-px bg-slate-200" aria-hidden="true" />}
+                    <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                      isLatest ? "bg-emerald-800 text-white" : "border-2 border-emerald-700 bg-white text-emerald-800"
+                    }`}>
+                      {riwayat.status_tahapan === "menunggu"
+                        ? <Clock3 className="h-3.5 w-3.5" />
+                        : <CheckCircle2 className="h-4 w-4" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <StatusBadge status={riwayat.status_tahapan} size="sm" />
+                        <time className="text-xs text-slate-500">{formatDate(riwayat.waktu_pembaruan)}</time>
+                      </div>
+                      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{riwayat.catatan_petugas}</p>
                     </div>
-                    <p>{r.catatan_petugas}</p>
                   </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-xs text-slate-500 italic bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                Laporan ini sedang dalam antrean verifikasi Admin Nagari. Tanggapan dan instruksi tindak lanjut akan diperbarui di sini.
+                );
+              })}
+            </ol>
+            {ticketData.riwayat.length === 0 && (
+              <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                Laporan sedang menunggu pemeriksaan. Catatan aparatur akan muncul di sini setelah ada tindak lanjut.
               </p>
             )}
-          </div>
+          </section>
         </div>
       )}
     </div>
@@ -205,13 +278,7 @@ function CekTiketContent() {
 
 export default function CekTiketPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="py-20 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" /> Memuat halaman pelacakan tiket...
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500">Memuat halaman pelacakan...</div>}>
       <CekTiketContent />
     </Suspense>
   );

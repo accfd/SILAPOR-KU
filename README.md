@@ -364,6 +364,14 @@ npx drizzle-kit studio
 npm run db:seed
 ```
 
+`npm run db:seed` juga membuat 9 laporan dummy dengan lampiran, lokasi, status,
+dan riwayat tindak lanjut untuk membantu uji coba dashboard dan pelacakan.
+Contoh ini menggunakan identitas fiktif dan tiket `SLP-202610-*`; jalankan seed
+hanya pada database development/test. Seed bersifat idempoten dan tidak
+mengubah laporan yang sudah ada. Akun aparatur baru mendapat kata sandi acak
+yang dicetak sekali, kecuali `SEED_ADMIN_PASSWORD` dan `SEED_WALI_PASSWORD`
+diatur sebelumnya.
+
 ### Menjalankan Server Pengembangan
 
 Jalankan aplikasi di lingkungan lokal:
@@ -387,7 +395,7 @@ Buka peramban Anda di [http://localhost:3000](http://localhost:3000) untuk menga
 | `npx drizzle-kit push` | Menerapkan perubahan skema `schema.ts` langsung ke database Neon. |
 | `npx drizzle-kit generate` | Menghasilkan berkas migrasi SQL statis di folder `drizzle/`. |
 | `npx drizzle-kit studio` | Membuka antarmuka web visual untuk mengelola database lokal/cloud. |
-| `npm run db:seed` | Mengisi jorong, kategori, dan akun aparatur awal (idempoten; kata sandi dari `SEED_*_PASSWORD` atau acak). |
+| `npm run db:seed` | Mengisi jorong, kategori, akun aparatur, dan contoh laporan/tindak lanjut (idempoten; khusus database development/test). |
 
 ---
 

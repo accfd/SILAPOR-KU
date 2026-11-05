@@ -1,396 +1,673 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Clipboard,
+  FileText,
+  ImagePlus,
+  Loader2,
+  MapPin,
+  Navigation,
+  Shield,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { createLaporan, getOpsiFormulir } from "@/lib/actions/laporan";
-import { MAKS_UKURAN_LAMPIRAN, TIPE_LAMPIRAN_DIIZINKAN } from "@/lib/constants";
+import {
+  JENIS_LAPORAN,
+  MAKS_JUMLAH_LAMPIRAN,
+  MAKS_UKURAN_LAMPIRAN,
+  TIPE_LAMPIRAN_DIIZINKAN,
+} from "@/lib/constants";
 import type { CreateLaporanInput, OpsiFormulir } from "@/types";
 
 type LampiranInput = CreateLaporanInput["lampiran"][number];
-import { FileText, Upload, AlertCircle, CheckCircle2, Shield, ArrowLeft, Loader2 } from "lucide-react";
+type FormData = Omit<CreateLaporanInput, "lampiran" | "koordinat_lintang" | "koordinat_bujur">;
+
+const BATAS_FOTO_TERKOMPRESI = 460 * 1024;
+const UKURAN_SISI_MAKS = 1600;
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Foto tidak dapat diproses."))),
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Foto tidak dapat dibaca."));
+    };
+    reader.onerror = () => reject(new Error("Foto tidak dapat dibaca."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function siapkanFoto(file: File): Promise<LampiranInput> {
+  const bitmap = await createImageBitmap(file);
+  let lebar = Math.min(bitmap.width, UKURAN_SISI_MAKS);
+  let tinggi = Math.round((bitmap.height / bitmap.width) * lebar);
+  let hasil: Blob | null = null;
+
+  try {
+    for (let skala = 0; skala < 5; skala++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = lebar;
+      canvas.height = tinggi;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Peramban tidak dapat memproses foto.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, lebar, tinggi);
+      context.drawImage(bitmap, 0, 0, lebar, tinggi);
+
+      for (const kualitas of [0.82, 0.72, 0.62, 0.52, 0.42]) {
+        const fotoTerkompresi = await canvasToBlob(canvas, kualitas);
+        hasil = fotoTerkompresi;
+        if (fotoTerkompresi.size <= BATAS_FOTO_TERKOMPRESI) break;
+      }
+
+      if (hasil && hasil.size <= BATAS_FOTO_TERKOMPRESI) break;
+      lebar = Math.max(640, Math.round(lebar * 0.82));
+      tinggi = Math.round((bitmap.height / bitmap.width) * lebar);
+    }
+  } finally {
+    bitmap.close();
+  }
+
+  if (!hasil || hasil.size > BATAS_FOTO_TERKOMPRESI) {
+    throw new Error(`Foto "${file.name}" terlalu besar untuk diproses. Pilih foto lain.`);
+  }
+
+  const nama = file.name.replace(/\.[^.]+$/, "") || "foto-bukti";
+  return {
+    nama_berkas: `${nama}.jpg`,
+    jalur_berkas: await blobToDataUrl(hasil),
+    tipe_berkas: "image/jpeg",
+    ukuran_berkas: hasil.size,
+  };
+}
+
+function pesanGalatOpsi(result: { message: string; success: boolean }) {
+  return result.success ? null : result.message || "Gagal memuat pilihan kategori dan jorong.";
+}
 
 export default function LaporPage() {
+  const inputFoto = useRef<HTMLInputElement>(null);
   const [isAnonim, setIsAnonim] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [createdTicketCode, setCreatedTicketCode] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
   const [opsi, setOpsi] = useState<OpsiFormulir | null>(null);
-
-  const [formData, setFormData] = useState({
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [lampiran, setLampiran] = useState<LampiranInput[]>([]);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [formData, setFormData] = useState<FormData>({
+    is_anonim: false,
     nama_pelapor: "",
-    nomor_telepon: "",
-    judul: "",
+    nomor_kontak: "",
+    jenis_laporan: "pengaduan",
+    judul_laporan: "",
+    deskripsi_laporan: "",
     id_kategori: "",
     id_jorong: "",
-    lokasi: "",
-    deskripsi: "",
+    patokan_lokasi: "",
   });
 
-  const [lampiran, setLampiran] = useState<LampiranInput | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
-
   useEffect(() => {
-    getOpsiFormulir().then((res) => {
-      if (res.success && res.data) {
-        const data = res.data;
-        setOpsi(data);
-        setFormData((prev) => ({
-          ...prev,
-          id_kategori: data.kategori[0]?.id_kategori ?? "",
-          id_jorong: data.jorong[0]?.id_jorong ?? "",
-        }));
-      } else {
-        setErrorMessage(res.message || "Gagal memuat pilihan kategori dan jorong.");
-      }
-    });
+    let active = true;
+    getOpsiFormulir()
+      .then((result) => {
+        if (!active) return;
+        const error = pesanGalatOpsi(result);
+        if (error) {
+          setOptionsError(error);
+          return;
+        }
+        if (result.data) {
+          setOpsi(result.data);
+          setFormData((previous) => ({
+            ...previous,
+            id_kategori: result.data?.kategori[0]?.id_kategori ?? "",
+            id_jorong: result.data?.jorong[0]?.id_jorong ?? "",
+          }));
+        }
+      })
+      .catch(() => {
+        if (active) setOptionsError("Pilihan formulir tidak dapat dimuat. Periksa koneksi lalu muat ulang halaman.");
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
 
-    if (!(TIPE_LAMPIRAN_DIIZINKAN as readonly string[]).includes(file.type)) {
-      setErrorMessage("Format berkas harus berupa foto/gambar (JPG, JPEG, PNG, WebP).");
-      return;
-    }
-
-    if (file.size > MAKS_UKURAN_LAMPIRAN) {
-      setErrorMessage("Ukuran foto melebihi batas maksimal 5 MB.");
+    const ruangTersedia = MAKS_JUMLAH_LAMPIRAN - lampiran.length;
+    if (files.length > ruangTersedia) {
+      setErrorMessage(`Maksimal ${MAKS_JUMLAH_LAMPIRAN} foto. Hapus foto yang sudah dipilih sebelum menambahkan lagi.`);
       return;
     }
 
     setErrorMessage(null);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      setFilePreview(result);
-      // Untuk MVP awal, foto dikirim sebagai Data URL (lihat catatan bodySizeLimit di next.config.ts)
-      setLampiran({
-        nama_berkas: file.name,
-        jalur_berkas: result,
-        tipe_berkas: file.type as LampiranInput["tipe_berkas"],
-        ukuran_berkas: file.size,
-      });
-    };
-    reader.readAsDataURL(file);
+    setIsProcessingFiles(true);
+    try {
+      const fotoBaru: LampiranInput[] = [];
+      for (const file of files) {
+        if (!(TIPE_LAMPIRAN_DIIZINKAN as readonly string[]).includes(file.type)) {
+          throw new Error(`"${file.name}" bukan foto JPG, PNG, atau WebP.`);
+        }
+        if (file.size > MAKS_UKURAN_LAMPIRAN) {
+          throw new Error(`Ukuran "${file.name}" melebihi batas maksimal 5 MB.`);
+        }
+        fotoBaru.push(await siapkanFoto(file));
+      }
+      setLampiran((previous) => [...previous, ...fotoBaru]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Foto gagal diproses. Silakan coba foto lain.");
+    } finally {
+      setIsProcessingFiles(false);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    // Validasi foto wajib sesuai PRD FR-03 & FR-05
-    if (!lampiran) {
-      setErrorMessage("Wajib melampirkan minimal 1 foto bukti kondisi di lapangan.");
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      setErrorMessage("Peramban ini tidak mendukung pengambilan lokasi otomatis.");
       return;
     }
 
-    if (!isAnonim && !formData.nama_pelapor) {
-      setErrorMessage("Silakan isi nama lengkap pelapor atau pilih opsi 'Laporkan Secara Anonim'.");
+    setErrorMessage(null);
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLatitude(coords.latitude.toFixed(6));
+        setLongitude(coords.longitude.toFixed(6));
+        setIsLocating(false);
+      },
+      (error) => {
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? "Izin lokasi ditolak. Aktifkan izin lokasi atau masukkan koordinat secara manual."
+            : error.code === error.TIMEOUT
+              ? "Pengambilan lokasi melewati batas waktu. Silakan coba kembali."
+              : "Lokasi tidak dapat ditentukan. Pastikan GPS perangkat aktif.";
+        setErrorMessage(message);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    );
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage(null);
+
+    if (lampiran.length === 0) {
+      setErrorMessage("Tambahkan minimal satu foto bukti sebelum mengirim laporan.");
+      return;
+    }
+    if (lampiran.length > MAKS_JUMLAH_LAMPIRAN) {
+      setErrorMessage(`Maksimal ${MAKS_JUMLAH_LAMPIRAN} foto untuk setiap laporan.`);
       return;
     }
 
     setIsSubmitting(true);
     try {
       const result = await createLaporan({
+        ...formData,
         is_anonim: isAnonim,
-        nama_pelapor: formData.nama_pelapor,
-        nomor_kontak: formData.nomor_telepon,
-        judul_laporan: formData.judul,
-        deskripsi_laporan: formData.deskripsi,
-        id_kategori: formData.id_kategori,
-        id_jorong: formData.id_jorong,
-        patokan_lokasi: formData.lokasi,
-        lampiran: [lampiran],
+        koordinat_lintang: latitude.trim() ? Number(latitude) : null,
+        koordinat_bujur: longitude.trim() ? Number(longitude) : null,
+        lampiran,
       });
 
       if (result.success && result.data?.kode_tiket) {
         setCreatedTicketCode(result.data.kode_tiket);
       } else {
-        setErrorMessage(result.message || "Gagal mengirim laporan. Silakan periksa kembali formulir.");
+        const fieldError = Object.values(result.errors ?? {}).flat()[0];
+        setErrorMessage(fieldError ?? result.message ?? "Laporan gagal dikirim. Periksa kembali isian Anda.");
       }
     } catch {
-      setErrorMessage("Terjadi gangguan jaringan saat mengirim laporan.");
+      setErrorMessage("Laporan belum terkirim karena gangguan jaringan. Periksa koneksi lalu coba kembali.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleCopyTicket = async () => {
+    if (!createdTicketCode) return;
+    try {
+      await navigator.clipboard.writeText(createdTicketCode);
+      setCopyMessage("Kode tiket berhasil disalin.");
+    } catch {
+      setCopyMessage("Kode tiket tidak dapat disalin otomatis. Silakan salin kode secara manual.");
+    }
+  };
+
   if (createdTicketCode) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16">
-        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-10 h-10" />
+      <div className="mx-auto max-w-2xl px-4 py-12 sm:py-16">
+        <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-xl sm:p-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <CheckCircle2 className="h-10 w-10" />
           </div>
-
           <div className="space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              Laporan Berhasil Terkirim!
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base">
-              Aduan Anda telah tercatat dalam sistem dan akan segera diverifikasi oleh Admin Nagari Kambang Utara.
+            <p className="text-sm font-semibold text-emerald-800">Laporan berhasil dikirim</p>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+              Terima kasih atas kepedulian Anda
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-600">
+              Simpan kode tiket berikut untuk memantau perkembangan laporan secara mandiri.
             </p>
           </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-2">
-            <span className="text-xs uppercase font-semibold tracking-wider text-slate-500">
-              Kode Tiket Pelacakan Anda
-            </span>
-            <div className="text-3xl font-mono font-bold text-emerald-600 tracking-wider">
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kode tiket Anda</span>
+            <p className="break-all font-mono text-2xl font-bold tracking-wider text-emerald-800 sm:text-3xl">
               {createdTicketCode}
-            </div>
-            <p className="text-xs text-slate-500">
-              Simpan kode ini untuk mengecek status tindak lanjut aduan secara mandiri.
             </p>
+            <button
+              type="button"
+              onClick={handleCopyTicket}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              <Clipboard className="h-4 w-4" />
+              Salin kode tiket
+            </button>
+            {copyMessage && <p role="status" className="text-xs text-slate-600">{copyMessage}</p>}
           </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href={`/cek-tiket?kode=${createdTicketCode}`}
-              className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition text-center text-sm"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900"
             >
-              Lacak Status Laporan Sekarang
+              Lacak status laporan <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/"
-              className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition text-center text-sm"
+              className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
-              Kembali ke Beranda
+              Kembali ke beranda
             </Link>
           </div>
-        </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 mb-6 transition"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Kembali ke Beranda
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <Link href="/" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <ArrowLeft className="h-4 w-4" />
+        Kembali ke beranda
       </Link>
 
-      <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-sm space-y-8">
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-2">
-            <FileText className="w-4 h-4" />
-            Formulir Layanan Aspirasi
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.8fr)]">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          <div className="mb-7">
+            <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-800">
+              <FileText className="h-4 w-4" />
+              Formulir layanan aspirasi
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Sampaikan laporan</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Isi informasi kejadian dan sertakan foto bukti agar laporan dapat ditinjau dengan baik.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Buat Laporan Baru
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Sampaikan permasalahan di lingkungan Anda dengan jelas dan sertakan foto bukti kondisi lapangan.
-          </p>
-        </div>
 
-        {errorMessage && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+          {(errorMessage || optionsError) && (
+            <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <span>{errorMessage ?? optionsError}</span>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Identitas Pelapor / Anonim */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/70 space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-emerald-600" />
-                Privasi Pelapor
-              </label>
-              <label className="inline-flex items-center gap-2 cursor-pointer text-xs sm:text-sm font-medium text-slate-700">
+          <form onSubmit={handleSubmit} className="space-y-7">
+            <fieldset className="space-y-3">
+              <legend className="mb-3 text-sm font-semibold text-slate-900">Jenis penyampaian</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {JENIS_LAPORAN.map((jenis) => {
+                  const selected = formData.jenis_laporan === jenis;
+                  return (
+                    <label
+                      key={jenis}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                        selected ? "border-emerald-700 bg-emerald-50" : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="jenis_laporan"
+                        value={jenis}
+                        checked={selected}
+                        onChange={() => setFormData((previous) => ({ ...previous, jenis_laporan: jenis }))}
+                        className="mt-1 h-4 w-4 accent-emerald-800"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-slate-900">
+                          {jenis === "pengaduan" ? "Pengaduan masalah" : "Aspirasi & usulan"}
+                        </span>
+                        <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                          {jenis === "pengaduan"
+                            ? "Laporkan masalah atau kondisi yang perlu ditangani."
+                            : "Sampaikan usulan untuk kemajuan Nagari."}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-4">
+              <legend className="text-sm font-semibold text-slate-900">Informasi laporan</legend>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="kategori" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    Kategori <span className="text-rose-600">*</span>
+                  </label>
+                  <select
+                    id="kategori"
+                    required
+                    value={formData.id_kategori}
+                    onChange={(event) => setFormData((previous) => ({ ...previous, id_kategori: event.target.value }))}
+                    disabled={!opsi?.kategori.length}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 disabled:bg-slate-100"
+                  >
+                    <option value="">Pilih kategori</option>
+                    {opsi?.kategori.map((kategori) => (
+                      <option key={kategori.id_kategori} value={kategori.id_kategori}>{kategori.nama_kategori}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="jorong" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    Wilayah jorong <span className="text-rose-600">*</span>
+                  </label>
+                  <select
+                    id="jorong"
+                    required
+                    value={formData.id_jorong}
+                    onChange={(event) => setFormData((previous) => ({ ...previous, id_jorong: event.target.value }))}
+                    disabled={!opsi?.jorong.length}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 disabled:bg-slate-100"
+                  >
+                    <option value="">Pilih jorong</option>
+                    {opsi?.jorong.map((jorong) => (
+                      <option key={jorong.id_jorong} value={jorong.id_jorong}>{jorong.nama_jorong}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="judul" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                  Judul laporan <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  id="judul"
+                  type="text"
+                  minLength={5}
+                  maxLength={150}
+                  required
+                  value={formData.judul_laporan}
+                  onChange={(event) => setFormData((previous) => ({ ...previous, judul_laporan: event.target.value }))}
+                  placeholder="Contoh: Lampu jalan tidak menyala di Jorong Kambang Barat"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                />
+              </div>
+              <div>
+                <label htmlFor="deskripsi" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                  Uraian kejadian <span className="text-rose-600">*</span>
+                </label>
+                <textarea
+                  id="deskripsi"
+                  rows={5}
+                  minLength={10}
+                  maxLength={3000}
+                  required
+                  value={formData.deskripsi_laporan}
+                  onChange={(event) => setFormData((previous) => ({ ...previous, deskripsi_laporan: event.target.value }))}
+                  placeholder="Jelaskan kronologi, dampak, dan informasi lain yang membantu penanganan laporan."
+                  className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                />
+                <p className="mt-1 text-right text-xs text-slate-500">{formData.deskripsi_laporan.length}/3000 karakter</p>
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-4">
+              <legend className="text-sm font-semibold text-slate-900">Lokasi dan bukti pendukung</legend>
+              <div>
+                <label htmlFor="lokasi" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                  Patokan atau alamat kejadian <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  id="lokasi"
+                  type="text"
+                  minLength={3}
+                  maxLength={500}
+                  required
+                  value={formData.patokan_lokasi}
+                  onChange={(event) => setFormData((previous) => ({ ...previous, patokan_lokasi: event.target.value }))}
+                  placeholder="Contoh: Di depan kantor jorong, dekat jembatan"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                />
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <MapPin className="h-4 w-4 text-emerald-800" />
+                      Titik koordinat GPS
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Opsional, tetapi membantu petugas menemukan lokasi secara akurat.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGetLocation}
+                    disabled={isLocating}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-emerald-800 px-3 py-2 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-60"
+                  >
+                    {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+                    {isLocating ? "Mencari lokasi..." : "Gunakan lokasi saya"}
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-medium text-slate-700">
+                    Lintang
+                    <input
+                      type="number"
+                      step="any"
+                      min="-90"
+                      max="90"
+                      value={latitude}
+                      onChange={(event) => setLatitude(event.target.value)}
+                      placeholder="-1.234567"
+                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-slate-700">
+                    Bujur
+                    <input
+                      type="number"
+                      step="any"
+                      min="-180"
+                      max="180"
+                      value={longitude}
+                      onChange={(event) => setLongitude(event.target.value)}
+                      placeholder="100.123456"
+                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Foto bukti <span className="text-rose-600">* minimal 1</span>
+                  </label>
+                  <span className="text-xs text-slate-500">{lampiran.length}/{MAKS_JUMLAH_LAMPIRAN} foto</span>
+                </div>
+                <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5 text-center transition hover:border-emerald-700">
+                  <input
+                    ref={inputFoto}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={handleFileChange}
+                    disabled={isProcessingFiles || lampiran.length >= MAKS_JUMLAH_LAMPIRAN}
+                    className="sr-only"
+                    aria-label="Pilih foto bukti"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => inputFoto.current?.click()}
+                    disabled={isProcessingFiles || lampiran.length >= MAKS_JUMLAH_LAMPIRAN}
+                    className="mx-auto flex flex-col items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isProcessingFiles ? <Loader2 className="h-8 w-8 animate-spin text-emerald-800" /> : <ImagePlus className="h-8 w-8 text-emerald-800" />}
+                    <span className="text-sm font-semibold text-slate-800">
+                      {isProcessingFiles ? "Menyiapkan foto..." : "Pilih foto dari galeri atau kamera"}
+                    </span>
+                    <span className="text-xs text-slate-500">JPG, PNG, atau WebP · maksimal 5 MB per foto</span>
+                  </button>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                  Foto dioptimalkan dengan tetap menjaga keterbacaan sebelum dikirim. Unggah hingga {MAKS_JUMLAH_LAMPIRAN} foto.
+                </p>
+
+                {lampiran.length > 0 && (
+                  <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {lampiran.map((foto, index) => (
+                      <li key={`${foto.nama_berkas}-${index}`} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={foto.jalur_berkas} alt={`Pratinjau ${foto.nama_berkas}`} className="h-32 w-full object-cover" />
+                        <div className="flex items-center justify-between gap-2 p-2">
+                          <span className="min-w-0 truncate text-xs text-slate-600" title={foto.nama_berkas}>{foto.nama_berkas}</span>
+                          <button
+                            type="button"
+                            onClick={() => setLampiran((previous) => previous.filter((_, current) => current !== index))}
+                            aria-label={`Hapus ${foto.nama_berkas}`}
+                            className="rounded p-1 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+              <legend className="px-1 text-sm font-semibold text-slate-900">Identitas pelapor</legend>
+              <label className="flex cursor-pointer items-start gap-3">
                 <input
                   type="checkbox"
                   checked={isAnonim}
-                  onChange={(e) => setIsAnonim(e.target.checked)}
-                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  onChange={(event) => setIsAnonim(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded accent-emerald-800"
                 />
-                Laporkan Secara Anonim
+                <span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <Shield className="h-4 w-4 text-emerald-800" />
+                    Laporkan secara anonim
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                    Nama dan nomor kontak tidak akan dicantumkan pada laporan anonim.
+                  </span>
+                </span>
               </label>
-            </div>
-
-            {!isAnonim ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Nama Lengkap <span className="text-rose-500">*</span>
+              {!isAnonim && (
+                <div className="grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Nama lengkap <span className="text-rose-600">*</span>
+                    <input
+                      type="text"
+                      maxLength={100}
+                      required={!isAnonim}
+                      value={typeof formData.nama_pelapor === "string" ? formData.nama_pelapor : ""}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, nama_pelapor: event.target.value }))}
+                      placeholder="Nama Anda"
+                      className="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"
+                    />
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.nama_pelapor}
-                    onChange={(e) => setFormData({ ...formData, nama_pelapor: e.target.value })}
-                    placeholder="Nama sesuai KTP"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Nomor WhatsApp</label>
-                  <input
-                    type="text"
-                    value={formData.nomor_telepon}
-                    onChange={(e) => setFormData({ ...formData, nomor_telepon: e.target.value })}
-                    placeholder="08xxxxxxxxxx"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                  />
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 italic bg-white p-3 rounded-lg border border-slate-200">
-                Identitas Anda dirahasiakan sepenuhnya. Laporan hanya akan diidentifikasi dengan kode tiket unik.
-              </p>
-            )}
-          </div>
-
-          {/* Klasifikasi Aduan */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-                Kategori Laporan <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={formData.id_kategori}
-                onChange={(e) => setFormData({ ...formData, id_kategori: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              >
-                {opsi?.kategori.map((kat) => (
-                  <option key={kat.id_kategori} value={kat.id_kategori}>
-                    {kat.nama_kategori}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-                Wilayah Jorong <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={formData.id_jorong}
-                onChange={(e) => setFormData({ ...formData, id_jorong: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              >
-                {opsi?.jorong.map((j) => (
-                  <option key={j.id_jorong} value={j.id_jorong}>
-                    {j.nama_jorong}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Judul & Detail */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-              Judul Laporan / Keluhan <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.judul}
-              onChange={(e) => setFormData({ ...formData, judul: e.target.value })}
-              placeholder="Contoh: Lampu Jalan Mati di Pertigaan Jorong Kambang Barat"
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-              Patokan / Alamat Lokasi Kejadian <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.lokasi}
-              onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
-              placeholder="Contoh: Depan Mushalla Al-Ikhlas, RT 02 / RW 01"
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-              Deskripsi Lengkap Kejadian <span className="text-rose-500">*</span>
-            </label>
-            <textarea
-              required
-              rows={4}
-              value={formData.deskripsi}
-              onChange={(e) => setFormData({ ...formData, deskripsi: e.target.value })}
-              placeholder="Jelaskan secara rinci kronologi kejadian, dampak yang dirasakan warga, atau saran perbaikan..."
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            />
-          </div>
-
-          {/* Unggah Foto Bukti Wajib */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-              Foto Bukti Kejadian <span className="text-rose-500">* (Wajib Minimal 1 Foto)</span>
-            </label>
-            <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-emerald-500 transition bg-slate-50/50">
-              {filePreview ? (
-                <div className="space-y-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={filePreview}
-                    alt="Pratinjau Foto Bukti"
-                    className="max-h-56 mx-auto rounded-xl object-contain border border-slate-200"
-                  />
-                  <label
-                    htmlFor="foto-input"
-                    className="inline-block text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
-                  >
-                    Ganti Foto Lain
+                  <label className="text-xs font-semibold text-slate-700">
+                    Nomor telepon <span className="font-normal text-slate-500">(opsional)</span>
+                    <input
+                      type="tel"
+                      maxLength={16}
+                      value={typeof formData.nomor_kontak === "string" ? formData.nomor_kontak : ""}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, nomor_kontak: event.target.value }))}
+                      placeholder="Contoh: 081234567890"
+                      className="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"
+                    />
                   </label>
                 </div>
-              ) : (
-                <label htmlFor="foto-input" className="cursor-pointer block space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <div className="text-sm font-medium text-slate-700">
-                    Klik untuk memilih foto dari galeri/kamera
-                  </div>
-                  <p className="text-xs text-slate-500">Mendukung format JPG, PNG, atau WebP (Maks. 5 MB)</p>
-                </label>
               )}
-              <input
-                id="foto-input"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
-          </div>
+            </fieldset>
 
-          {/* Tombol Kirim */}
-          <div className="pt-4">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2"
+              disabled={isSubmitting || isProcessingFiles || !opsi || lampiran.length === 0}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Mengirim Laporan ke Sistem...
-                </>
-              ) : (
-                <>
-                  <FileText className="w-5 h-5" />
-                  Kirim Pengaduan Sekarang
-                </>
-              )}
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+              {isSubmitting ? "Mengirim laporan..." : "Kirim laporan"}
             </button>
-          </div>
-        </form>
+          </form>
+        </section>
+
+        <aside className="space-y-4 lg:sticky lg:top-24">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-bold text-slate-900">Sebelum mengirim</h2>
+            <ol className="mt-4 space-y-4">
+              {[
+                "Gunakan judul dan uraian yang jelas agar laporan mudah dipahami.",
+                "Pilih kategori dan jorong sesuai lokasi kejadian.",
+                "Sertakan minimal satu foto sebagai bukti pendukung.",
+                "Simpan kode tiket yang diberikan setelah laporan berhasil dikirim.",
+              ].map((panduan, index) => (
+                <li key={panduan} className="flex gap-3 text-xs leading-relaxed text-slate-600">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-900">
+                    {index + 1}
+                  </span>
+                  {panduan}
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="rounded-2xl bg-emerald-950 p-5 text-white">
+            <h2 className="text-sm font-bold">Alur tindak lanjut</h2>
+            <ol className="mt-4 space-y-3 text-xs text-emerald-50">
+              <li className="flex items-center gap-3"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15">1</span>Laporan diterima dan diverifikasi.</li>
+              <li className="flex items-center gap-3"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15">2</span>Petugas memberikan pembaruan penanganan.</li>
+              <li className="flex items-center gap-3"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15">3</span>Perkembangan dapat dilacak dengan kode tiket.</li>
+            </ol>
+          </section>
+        </aside>
       </div>
     </div>
   );
