@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -11,8 +12,6 @@ import {
   FileText,
   ImagePlus,
   Loader2,
-  MapPin,
-  Navigation,
   Shield,
   Trash2,
   Upload,
@@ -31,6 +30,16 @@ type FormData = Omit<CreateLaporanInput, "lampiran" | "koordinat_lintang" | "koo
 
 const BATAS_FOTO_TERKOMPRESI = 460 * 1024;
 const UKURAN_SISI_MAKS = 1600;
+
+const MapPicker = dynamic(() => import("@/components/MapPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-72 w-full items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white text-xs text-slate-500">
+      <Loader2 className="mr-2 h-4 w-4 animate-spin text-emerald-800" />
+      Memuat peta interaktif Nagari Kambang Utara...
+    </div>
+  ),
+});
 
 function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -470,55 +479,17 @@ export default function LaporPage() {
                 />
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                  <div>
-                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      <MapPin className="h-4 w-4 text-emerald-800" />
-                      Titik koordinat GPS
-                    </p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      Opsional, tetapi membantu petugas menemukan lokasi secara akurat.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleGetLocation}
-                    disabled={isLocating}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-emerald-800 px-3 py-2 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-60"
-                  >
-                    {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-                    {isLocating ? "Mencari lokasi..." : "Gunakan lokasi saya"}
-                  </button>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-medium text-slate-700">
-                    Lintang
-                    <input
-                      type="number"
-                      step="any"
-                      min="-90"
-                      max="90"
-                      value={latitude}
-                      onChange={(event) => setLatitude(event.target.value)}
-                      placeholder="-1.234567"
-                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm"
-                    />
-                  </label>
-                  <label className="text-xs font-medium text-slate-700">
-                    Bujur
-                    <input
-                      type="number"
-                      step="any"
-                      min="-180"
-                      max="180"
-                      value={longitude}
-                      onChange={(event) => setLongitude(event.target.value)}
-                      placeholder="100.123456"
-                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm"
-                    />
-                  </label>
-                </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+                <MapPicker
+                  latitude={latitude}
+                  longitude={longitude}
+                  onChange={(lat, lng) => {
+                    setLatitude(lat);
+                    setLongitude(lng);
+                  }}
+                  isLocating={isLocating}
+                  onGetLocation={handleGetLocation}
+                />
               </div>
 
               <div>

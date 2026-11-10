@@ -185,8 +185,10 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="print-area mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {/* TAMPILAN INTERAKTIF DI LAYAR (SCREEN ONLY) */}
+      <div className="screen-only space-y-7">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           <div className="mb-1 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-800">
             <FileText className="h-4 w-4" />
@@ -536,6 +538,136 @@ export default function AdminDashboardPage() {
           </form>
         </Modal>
       )}
+      </div>
+
+      {/* DOKUMEN CETAK RESMI REKAPITULASI (A4 LANDSCAPE) */}
+      <div className="print-only landscape-doc bg-white font-sans text-xs text-slate-900">
+        {/* KOP SURAT KEDINASAN RESMI */}
+        <div className="border-b-4 border-double border-slate-950 pb-3 text-center">
+          <div className="flex items-center justify-center gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/Logo.webp"
+              alt="Logo Nagari Kambang Utara"
+              className="h-14 w-14 shrink-0 object-contain"
+            />
+            <div className="text-center">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-800">PEMERINTAH KABUPATEN PESISIR SELATAN</h3>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900">KECAMATAN LENGAYANG</h4>
+              <h2 className="text-base font-black uppercase tracking-wide text-slate-950">PEMERINTAH NAGARI KAMBANG UTARA</h2>
+              <p className="mt-0.5 text-[10px] text-slate-600">
+                Alamat: Jl. Raya Kambang - Pasar Baru, Nagari Kambang Utara, Kec. Lengayang, Kode Pos 25672
+              </p>
+              <p className="text-[10px] text-slate-600">
+                Laman Resmi: https://kambangutara.desa.id | Email: kontak@kambangutara.desa.id
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* JUDUL DOKUMEN & PARAMETER */}
+        <div className="my-4 text-center">
+          <h1 className="text-sm font-black uppercase tracking-wider underline">
+            REKAPITULASI DAFTAR PENGADUAN & ASPIRASI MASYARAKAT
+          </h1>
+          <p className="mt-1 text-[11px] font-medium text-slate-700">
+            Sistem Informasi Layanan Aspirasi & Pengaduan Nagari Kambang Utara (SILAPOR-KU)
+          </p>
+        </div>
+
+        {/* BARIS KETERANGAN FILTER & STATISTIK */}
+        <div className="mb-3 rounded border border-slate-400 bg-slate-50/70 p-2.5 text-[11px]">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <div>
+              <span className="font-semibold text-slate-700">Wilayah Jorong: </span>
+              <span className="font-bold text-slate-900">
+                {opsi?.jorong.find((j) => j.id_jorong === filterJorong)?.nama_jorong ?? "Semua Wilayah Jorong"}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold text-slate-700">Kategori Aduan: </span>
+              <span className="font-bold text-slate-900">
+                {opsi?.kategori.find((k) => k.id_kategori === filterKategori)?.nama_kategori ?? "Semua Kategori"}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold text-slate-700">Filter Status: </span>
+              <span className="font-bold uppercase text-slate-900">{filterStatus ? filterStatus : "Semua Status"}</span>
+            </div>
+            <div>
+              <span className="font-semibold text-slate-700">Rentang Tanggal: </span>
+              <span className="text-slate-900">
+                {filterDari || filterSampai ? `${filterDari || "Awal"} s.d. ${filterSampai || "Hari Ini"}` : "Semua Waktu"}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-4 border-t border-slate-300 pt-1.5 font-semibold text-slate-800">
+            <span>Total Aduan: <strong className="text-slate-950">{tickets.length}</strong></span>
+            <span>Menunggu: <strong className="text-amber-800">{jumlahStatus("menunggu")}</strong></span>
+            <span>Diproses: <strong className="text-blue-800">{jumlahStatus("diproses")}</strong></span>
+            <span>Selesai: <strong className="text-emerald-800">{jumlahStatus("selesai")}</strong></span>
+            <span>Ditolak: <strong className="text-rose-800">{jumlahStatus("ditolak")}</strong></span>
+          </div>
+        </div>
+
+        {/* TABEL DATA RESMI BERGARIS HITAM TEGAS */}
+        <table className="w-full border-collapse border border-slate-900 text-left text-[10px]">
+          <thead>
+            <tr className="border-b-2 border-slate-900 bg-slate-100 font-bold uppercase text-slate-900">
+              <th className="w-8 border border-slate-900 p-1.5 text-center">No</th>
+              <th className="w-24 border border-slate-900 p-1.5">Kode Tiket</th>
+              <th className="w-28 border border-slate-900 p-1.5">Waktu Masuk</th>
+              <th className="w-32 border border-slate-900 p-1.5">Pelapor</th>
+              <th className="w-28 border border-slate-900 p-1.5">Jorong</th>
+              <th className="w-32 border border-slate-900 p-1.5">Kategori</th>
+              <th className="border border-slate-900 p-1.5">Judul & Uraian Aduan</th>
+              <th className="w-20 border border-slate-900 p-1.5 text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tickets.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="border border-slate-900 p-4 text-center italic text-slate-500">
+                  Tidak ada data laporan yang sesuai dengan kriteria filter.
+                </td>
+              </tr>
+            ) : (
+              tickets.map((ticket, index) => (
+                <tr key={ticket.id_laporan} className="border-b border-slate-900">
+                  <td className="border border-slate-900 p-1.5 text-center">{index + 1}</td>
+                  <td className="border border-slate-900 p-1.5 font-mono font-bold text-slate-950">{ticket.kode_tiket}</td>
+                  <td className="border border-slate-900 p-1.5">{formatDate(ticket.waktu_dibuat)}</td>
+                  <td className="border border-slate-900 p-1.5">
+                    <p className="font-semibold">{ticket.is_anonim ? "Anonim (Rahasia)" : ticket.nama_pelapor || "Warga"}</p>
+                    <p className="text-[9px] text-slate-500">{ticket.is_anonim ? "Identitas Terlindungi" : "Pelapor Terdaftar"}</p>
+                  </td>
+                  <td className="border border-slate-900 p-1.5">{ticket.nama_jorong}</td>
+                  <td className="border border-slate-900 p-1.5">{ticket.nama_kategori}</td>
+                  <td className="border border-slate-900 p-1.5">
+                    <p className="font-bold text-slate-950">{ticket.judul_laporan}</p>
+                    <p className="mt-0.5 text-[9px] text-slate-600 capitalize">{ticket.jenis_laporan} · {ticket.jumlah_lampiran} Bukti Foto</p>
+                  </td>
+                  <td className="border border-slate-900 p-1.5 text-center font-bold uppercase text-[9px]">
+                    {ticket.status_laporan}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {/* KOLOM PENGESAHAN DOKUMEN (KANAN BAWAH) */}
+        <div className="mt-6 flex justify-end">
+          <div className="text-right text-xs">
+            <p>Kambang Utara, {formatDate(new Date())}</p>
+            <p className="mt-1 font-semibold">Petugas Administrasi Pelaporan Nagari</p>
+            <p className="text-[10px] text-slate-500">Pemerintah Nagari Kambang Utara</p>
+            <div className="h-16"></div>
+            <p className="font-bold underline text-slate-900">TIM ADMINISTRATOR NAGARI</p>
+            <p className="text-[10px] text-slate-600">Unit Pelayanan Informasi & Pengaduan</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

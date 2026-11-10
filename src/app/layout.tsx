@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: "SILAPOR-KU | Sistem Layanan Pengaduan & Aspirasi Nagari Kambang Utara",
   description:
     "Portal resmi pengaduan dan penyampaian aspirasi masyarakat Nagari Kambang Utara, Pesisir Selatan. Lapor mudah, lacak tiket transparan, dan tindak lanjut cepat.",
+  icons: {
+    icon: "/favicon.webp",
+    shortcut: "/favicon.webp",
+    apple: "/Logo.webp",
+  },
 };
 
 export default function RootLayout({

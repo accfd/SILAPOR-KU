@@ -169,8 +169,10 @@ export default function WaliNagariDashboardPage() {
   ];
 
   return (
-    <div className="print-area mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {/* TAMPILAN INTERAKTIF DI LAYAR (SCREEN ONLY) */}
+      <div className="screen-only space-y-7">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           <div className="mb-1 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-800">
             <ShieldCheck className="h-4 w-4" />
@@ -491,6 +493,184 @@ export default function WaliNagariDashboardPage() {
           )}
         </Modal>
       )}
+      </div>
+
+      {/* DOKUMEN CETAK RESMI LAPORAN EKSEKUTIF WALI NAGARI (A4) */}
+      <div className="print-only portrait-doc bg-white font-sans text-xs text-slate-900">
+        {/* KOP SURAT RESMI KANTOR WALI NAGARI */}
+        <div className="border-b-4 border-double border-slate-950 pb-3 text-center">
+          <div className="flex items-center justify-center gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/Logo.webp"
+              alt="Logo Nagari Kambang Utara"
+              className="h-16 w-16 shrink-0 object-contain"
+            />
+            <div className="text-center">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-800">PEMERINTAH KABUPATEN PESISIR SELATAN</h3>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900">KECAMATAN LENGAYANG</h4>
+              <h2 className="text-lg font-black uppercase tracking-wide text-slate-950">KANTOR WALI NAGARI KAMBANG UTARA</h2>
+              <p className="mt-0.5 text-[10px] text-slate-600">
+                Alamat: Jl. Raya Kambang - Pasar Baru, Nagari Kambang Utara, Kec. Lengayang, Kode Pos 25672
+              </p>
+              <p className="text-[10px] text-slate-600">
+                Laman Resmi: https://kambangutara.desa.id | Email: walinagari@kambangutara.desa.id
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* JUDUL DOKUMEN */}
+        <div className="my-5 text-center">
+          <h1 className="text-sm font-black uppercase tracking-wider underline">
+            LAPORAN EKSEKUTIF KINERJA PENANGANAN ASPIRASI & PENGADUAN NAGARI
+          </h1>
+          <p className="mt-1 text-xs text-slate-700">
+            Periode: <strong>{periode === "30-hari" ? "30 Hari Terakhir" : periode === "90-hari" ? "90 Hari Terakhir" : periode === "tahun-ini" ? "Tahun Berjalan" : "Semua Waktu"}</strong>
+            {" · "}
+            Wilayah: <strong>{opsi?.jorong.find((j) => j.id_jorong === filterJorong)?.nama_jorong ?? "Seluruh Jorong Nagari Kambang Utara"}</strong>
+          </p>
+        </div>
+
+        {/* BAGIAN I: INDIKATOR KINERJA UTAMA (KPI) */}
+        <div className="mb-5">
+          <h2 className="mb-2 border-b border-slate-300 pb-1 text-xs font-bold uppercase text-slate-900">
+            I. Ringkasan Eksekutif & Indikator Kunci (KPI)
+          </h2>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="rounded border border-slate-400 bg-slate-50 p-2.5">
+              <span className="block text-[10px] font-semibold uppercase text-slate-600">Total Laporan</span>
+              <span className="text-xl font-black text-slate-950">{total}</span>
+            </div>
+            <div className="rounded border border-slate-400 bg-slate-50 p-2.5">
+              <span className="block text-[10px] font-semibold uppercase text-slate-600">Laporan Selesai</span>
+              <span className="text-xl font-black text-emerald-800">{selesai}</span>
+            </div>
+            <div className="rounded border border-slate-400 bg-slate-50 p-2.5">
+              <span className="block text-[10px] font-semibold uppercase text-slate-600">Sedang Ditangani</span>
+              <span className="text-xl font-black text-blue-800">{diproses}</span>
+            </div>
+            <div className="rounded border border-slate-400 bg-slate-50 p-2.5">
+              <span className="block text-[10px] font-semibold uppercase text-slate-600">Tingkat Penyelesaian</span>
+              <span className="text-xl font-black text-emerald-800">{completionRate}%</span>
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] italic text-slate-600">
+            * Dari total {total} aduan masuk, sebanyak {selesai} laporan telah selesai ditangani ({completionRate}%), {diproses} laporan sedang ditindaklanjuti tim teknis, {menunggu} laporan menunggu verifikasi, dan {ditolak} laporan dinyatakan tidak memenuhi ketentuan.
+          </p>
+        </div>
+
+        {/* BAGIAN II & III: DISTRIBUSI SEBARAN JORONG & KATEGORI (2 KOLOM) */}
+        <div className="mb-5 grid grid-cols-2 gap-4">
+          <div>
+            <h2 className="mb-2 border-b border-slate-300 pb-1 text-xs font-bold uppercase text-slate-900">
+              II. Sebaran per Wilayah Jorong
+            </h2>
+            <table className="w-full border-collapse border border-slate-400 text-left text-[10px]">
+              <thead>
+                <tr className="border-b border-slate-400 bg-slate-100 font-bold uppercase">
+                  <th className="w-8 border border-slate-400 p-1.5 text-center">No</th>
+                  <th className="border border-slate-400 p-1.5">Wilayah Jorong</th>
+                  <th className="w-16 border border-slate-400 p-1.5 text-center">Jumlah</th>
+                  <th className="w-14 border border-slate-400 p-1.5 text-center">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(opsi?.jorong ?? []).map((j, idx) => {
+                  const count = jumlahPerJorong[j.nama_jorong] ?? 0;
+                  const pct = total ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <tr key={j.id_jorong} className="border-b border-slate-300">
+                      <td className="border border-slate-300 p-1.5 text-center">{idx + 1}</td>
+                      <td className="border border-slate-300 p-1.5">{j.nama_jorong}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-bold">{count}</td>
+                      <td className="border border-slate-300 p-1.5 text-center">{pct}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <h2 className="mb-2 border-b border-slate-300 pb-1 text-xs font-bold uppercase text-slate-900">
+              III. Sebaran per Kategori Layanan
+            </h2>
+            <table className="w-full border-collapse border border-slate-400 text-left text-[10px]">
+              <thead>
+                <tr className="border-b border-slate-400 bg-slate-100 font-bold uppercase">
+                  <th className="w-8 border border-slate-400 p-1.5 text-center">No</th>
+                  <th className="border border-slate-400 p-1.5">Kategori Aduan</th>
+                  <th className="w-16 border border-slate-400 p-1.5 text-center">Jumlah</th>
+                  <th className="w-14 border border-slate-400 p-1.5 text-center">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(opsi?.kategori ?? []).map((k, idx) => {
+                  const count = jumlahPerKategori[k.nama_kategori] ?? 0;
+                  const pct = total ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <tr key={k.id_kategori} className="border-b border-slate-300">
+                      <td className="border border-slate-300 p-1.5 text-center">{idx + 1}</td>
+                      <td className="border border-slate-300 p-1.5">{k.nama_kategori}</td>
+                      <td className="border border-slate-300 p-1.5 text-center font-bold">{count}</td>
+                      <td className="border border-slate-300 p-1.5 text-center">{pct}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* BAGIAN IV: DAFTAR LAPORAN TERAKHIR / PRIORITAS */}
+        <div className="mb-6">
+          <h2 className="mb-2 border-b border-slate-300 pb-1 text-xs font-bold uppercase text-slate-900">
+            IV. Rekapitulasi Sampel Laporan Terkini ({laporanTerbaru.length} Aduan)
+          </h2>
+          <table className="w-full border-collapse border border-slate-400 text-left text-[10px]">
+            <thead>
+              <tr className="border-b border-slate-400 bg-slate-100 font-bold uppercase">
+                <th className="w-8 border border-slate-400 p-1.5 text-center">No</th>
+                <th className="w-24 border border-slate-400 p-1.5">Kode Tiket</th>
+                <th className="w-24 border border-slate-400 p-1.5">Tanggal</th>
+                <th className="w-28 border border-slate-400 p-1.5">Jorong</th>
+                <th className="border border-slate-400 p-1.5">Judul Pengaduan / Aspirasi</th>
+                <th className="w-20 border border-slate-400 p-1.5 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {laporanTerbaru.map((ticket, idx) => (
+                <tr key={ticket.id_laporan} className="border-b border-slate-300">
+                  <td className="border border-slate-300 p-1.5 text-center">{idx + 1}</td>
+                  <td className="border border-slate-300 p-1.5 font-mono font-bold">{ticket.kode_tiket}</td>
+                  <td className="border border-slate-300 p-1.5">{formatDate(ticket.waktu_dibuat)}</td>
+                  <td className="border border-slate-300 p-1.5">{ticket.nama_jorong}</td>
+                  <td className="border border-slate-300 p-1.5">{ticket.judul_laporan}</td>
+                  <td className="border border-slate-300 p-1.5 text-center font-bold uppercase text-[9px]">{ticket.status_laporan}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* BAGIAN V: PENGESAHAN WALI NAGARI */}
+        <div className="flex justify-between border-t border-slate-300 pt-3 text-xs">
+          <div className="max-w-xs text-[10px] text-slate-500">
+            <p className="font-semibold text-slate-700">Catatan Evaluasi:</p>
+            <p>Laporan eksekutif ini disusun secara berkala sebagai bahan pertimbangan pengalokasian anggaran nagari, musrenbangdes, serta peningkatan kualitas pelayanan publik bagi warga Nagari Kambang Utara.</p>
+          </div>
+
+          <div className="text-right">
+            <p>Kambang Utara, {formatDate(new Date())}</p>
+            <p className="mt-1 font-semibold text-slate-900">Mengetahui,</p>
+            <p className="font-bold uppercase text-slate-950">WALI NAGARI KAMBANG UTARA</p>
+            <div className="h-16"></div>
+            <p className="font-bold underline text-slate-900">WALI NAGARI KAMBANG UTARA</p>
+            <p className="text-[10px] text-slate-600">Pemerintah Nagari Kambang Utara</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

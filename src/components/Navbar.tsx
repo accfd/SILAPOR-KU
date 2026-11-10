@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ShieldAlert, FileText, Search, UserCheck, Menu, X } from "lucide-react";
+import { FileText, Search, UserCheck, Menu, X } from "lucide-react";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,9 +13,12 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo & Brand */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:bg-emerald-700 transition">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/Logo.webp"
+              alt="Logo Nagari Kambang Utara"
+              className="w-10 h-10 object-contain drop-shadow-sm group-hover:scale-105 transition"
+            />
             <div>
               <span className="text-xl font-bold tracking-tight text-slate-900 block leading-tight">
                 SILAPOR<span className="text-emerald-600">-KU</span>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldAlert, MapPin, Mail, Phone } from "lucide-react";
+import { MapPin, Mail, Phone } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -9,9 +9,12 @@ export default function Footer() {
           {/* Brand & Info */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md">
-                <ShieldAlert className="w-6 h-6" />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/Logo.webp"
+                alt="Logo Nagari Kambang Utara"
+                className="w-10 h-10 object-contain drop-shadow"
+              />
               <span className="text-xl font-bold tracking-tight text-white">
                 SILAPOR<span className="text-emerald-400">-KU</span>
               </span>
@@ -74,8 +77,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-slate-800 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} Pemerintah Nagari Kambang Utara & Tim IS-SIA.</p>
-          <p>Ditenagai oleh Next.js & Neon PostgreSQL</p>
+          <p>© {new Date().getFullYear()} Pemerintah Nagari Kambang Utara & Tim IS-SIA. Hak cipta dilindungi.</p>
         </div>
       </div>
     </footer>

@@ -45,8 +45,9 @@ function AdminLoginContent() {
     <div className="flex min-h-[78vh] items-center justify-center px-4 py-10 sm:py-14">
       <section className="w-full max-w-md space-y-7 rounded-3xl border border-slate-200 bg-white p-7 shadow-xl sm:p-9">
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-950 text-white shadow-sm">
-            <ShieldAlert className="h-7 w-7 text-emerald-300" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/Logo.webp" alt="Logo Nagari Kambang Utara" className="h-16 w-16 object-contain drop-shadow" />
           </div>
           <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-emerald-800">Portal resmi SILAPOR-KU</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">Masuk aparatur</h1>

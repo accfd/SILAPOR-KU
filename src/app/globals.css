@@ -15,21 +15,45 @@ body {
 
 @media print {
   @page {
+    size: auto;
+    margin: 10mm 12mm;
+  }
+
+  @page landscape-doc {
     size: A4 landscape;
-    margin: 14mm;
+    margin: 10mm 12mm;
+  }
+
+  @page portrait-doc {
+    size: A4 portrait;
+    margin: 12mm 14mm;
+  }
+
+  .landscape-doc {
+    page: landscape-doc;
+  }
+
+  .portrait-doc {
+    page: portrait-doc;
   }
 
   body {
-    background: #fff;
-    color: #0f172a;
+    background: #fff !important;
+    color: #0f172a !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   header,
   footer,
-  .no-print {
+  nav,
+  .no-print,
+  .screen-only {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   .print-area {
@@ -37,4 +61,8 @@ body {
     max-width: none;
     padding: 0;
   }
+}
+
+.print-only {
+  display: none;
 }
