@@ -49,7 +49,7 @@ export default function Navbar() {
               className="px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-emerald-600 hover:bg-slate-50 rounded-lg transition flex items-center gap-1.5"
             >
               <Search className="w-4 h-4 text-emerald-600" />
-              Lacak Tiket
+              Lacak Laporan
             </Link>
             <div className="h-5 w-px bg-slate-200 mx-2" />
             <Link
