@@ -29,6 +29,10 @@ export const ALUR_STATUS: Record<StatusLaporan, readonly StatusLaporan[]> = {
   ditolak: [],
 };
 
+// Kategori penampung di luar kategori lain; selalu ditampilkan paling bawah pada dropdown.
+// Harus sama dengan nama kategori di src/db/seed.ts.
+export const KATEGORI_LAINNYA = "Lainnya";
+
 // Format kode tiket: SLP-YYYYMM-XXXX (4 karakter tanpa 0/O/1/I agar mudah dibaca & disalin warga)
 export const ALFABET_KODE_TIKET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const POLA_KODE_TIKET = /^SLP-\d{6}-[A-HJ-NP-Z2-9]{4}$/;
