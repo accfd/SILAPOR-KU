@@ -1,9 +1,15 @@
 /**
  * Seed data referensi & akun aparatur awal. Jalankan: npm run db:seed
  *
- * Idempoten: aman dijalankan berulang (jorong/kategori/aparatur yang sudah ada dilewati).
- * Kata sandi akun diambil dari SEED_ADMIN_PASSWORD / SEED_WALI_PASSWORD; bila kosong dibuat acak
- * dan dicetak sekali di terminal. Tidak ada kata sandi bawaan yang tertulis di repositori.
+ * Idempoten dan aman secara bawaan: jorong, kategori, dan akun aparatur yang sudah ada dilewati,
+ * kata sandi akun yang sudah ada TIDAK diubah, dan data dummy TIDAK dibuat.
+ *
+ * Akun baru: kata sandi dari SEED_ADMIN_PASSWORD / SEED_WALI_PASSWORD (min. 8 karakter); bila kosong
+ * dibuat acak dan dicetak sekali di terminal. Tidak ada kata sandi bawaan di repositori.
+ *
+ * Flag opsional (hanya untuk database development):
+ *   SEED_RESET_PASSWORD=1  menimpa kata sandi akun yang sudah ada (kedua SEED_*_PASSWORD wajib diisi).
+ *   SEED_DEMO=1            menambah 9 laporan dummy (SLP-202610-*); ditolak bila NODE_ENV=production.
  *
  * Tidak mengimpor src/db/index.ts karena modul itu bertanda `server-only` dan tidak dapat dijalankan di luar Next.js.
  */
@@ -243,41 +249,59 @@ const LAPORAN_DUMMY = [
   },
 ] as const;
 
-async function main() {
+async function seedReferensi() {
   await db.insert(jorong).values(DAFTAR_JORONG.map((nama_jorong) => ({ nama_jorong }))).onConflictDoNothing();
   await db.insert(kategori).values(DAFTAR_KATEGORI).onConflictDoNothing();
   console.log(`Jorong & kategori siap (${DAFTAR_JORONG.length} jorong, ${DAFTAR_KATEGORI.length} kategori).`);
-
-
-for (const akun of AKUN) {
-  const diberikan = process.env[akun.envPassword];
-
-  if (diberikan === undefined || diberikan.length < 8) {
-    throw new Error(`${akun.envPassword} wajib diisi dan minimal 8 karakter.`);
-  }
-
-  const passwordHash = await bcrypt.hash(diberikan, 12);
-
-  const hasil = await db
-    .insert(aparatur)
-    .values({
-      username: akun.username,
-      nama_lengkap: akun.nama_lengkap,
-      peran: akun.peran,
-      password_hash: passwordHash,
-    })
-    .onConflictDoUpdate({
-      target: aparatur.username,
-      set: {
-        password_hash: passwordHash,
-      },
-    })
-    .returning({ username: aparatur.username });
-
-  console.log(`Akun "${hasil[0].username}" siap. Password telah disinkronkan.`);
 }
 
+async function seedAkun() {
+  const timpaKataSandi = process.env.SEED_RESET_PASSWORD === "1";
 
+  for (const akun of AKUN) {
+    const diberikan = process.env[akun.envPassword] || undefined;
+    if (diberikan !== undefined && diberikan.length < 8) {
+      throw new Error(`${akun.envPassword} minimal 8 karakter.`);
+    }
+
+    const [ada] = await db
+      .select({ id_aparatur: aparatur.id_aparatur })
+      .from(aparatur)
+      .where(eq(aparatur.username, akun.username))
+      .limit(1);
+
+    if (ada && !timpaKataSandi) {
+      console.log(`Akun "${akun.username}" sudah ada; dilewati (kata sandi tidak diubah).`);
+      continue;
+    }
+    if (ada && !diberikan) {
+      throw new Error(`SEED_RESET_PASSWORD=1 memerlukan ${akun.envPassword} untuk akun "${akun.username}".`);
+    }
+
+    const kataSandi = diberikan ?? randomBytes(12).toString("base64url");
+    const passwordHash = await bcrypt.hash(kataSandi, 12);
+
+    if (ada) {
+      await db.update(aparatur).set({ password_hash: passwordHash }).where(eq(aparatur.id_aparatur, ada.id_aparatur));
+      console.log(`Akun "${akun.username}": kata sandi ditimpa dari ${akun.envPassword}.`);
+    } else {
+      await db.insert(aparatur).values({
+        username: akun.username,
+        nama_lengkap: akun.nama_lengkap,
+        peran: akun.peran,
+        password_hash: passwordHash,
+      });
+      console.log(
+        diberikan
+          ? `Akun "${akun.username}" dibuat dengan kata sandi dari ${akun.envPassword}.`
+          : `Akun "${akun.username}" dibuat. Kata sandi acak (hanya tampil sekali, simpan sekarang): ${kataSandi}`,
+      );
+    }
+  }
+}
+
+/** Data contoh untuk demo/pengembangan. Jangan dijalankan di database produksi. */
+async function seedDemo() {
   const daftarJorong = await db.select().from(jorong);
   const daftarKategori = await db.select().from(kategori);
   const idJorong = new Map(daftarJorong.map((row) => [row.nama_jorong, row.id_jorong]));
@@ -364,6 +388,20 @@ for (const akun of AKUN) {
       `${LAPORAN_DUMMY.filter((contoh) => contoh.is_anonim).length} laporan anonim).`,
   );
   console.log(`Kode tiket demo: ${LAPORAN_DUMMY.map((contoh) => contoh.kode_tiket).join(", ")}`);
+}
+
+async function main() {
+  await seedReferensi();
+  await seedAkun();
+
+  if (process.env.SEED_DEMO === "1") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SEED_DEMO=1 ditolak karena NODE_ENV=production.");
+    }
+    await seedDemo();
+  } else {
+    console.log("Data dummy laporan dilewati (set SEED_DEMO=1 untuk membuatnya di database development).");
+  }
 }
 
 main().catch((e) => {

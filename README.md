@@ -364,13 +364,23 @@ npx drizzle-kit studio
 npm run db:seed
 ```
 
-`npm run db:seed` juga membuat 9 laporan dummy dengan lampiran, lokasi, status,
-dan riwayat tindak lanjut untuk membantu uji coba dashboard dan pelacakan.
-Contoh ini menggunakan identitas fiktif dan tiket `SLP-202610-*`; jalankan seed
-hanya pada database development/test. Seed bersifat idempoten dan tidak
-mengubah laporan yang sudah ada. Akun aparatur baru mendapat kata sandi acak
-yang dicetak sekali, kecuali `SEED_ADMIN_PASSWORD` dan `SEED_WALI_PASSWORD`
-diatur sebelumnya.
+Secara bawaan `npm run db:seed` hanya mengisi jorong, kategori, dan akun
+aparatur yang belum ada. Seed bersifat idempoten: akun yang sudah ada dilewati
+dan kata sandinya tidak diubah. Akun baru mendapat kata sandi acak yang
+dicetak sekali, kecuali `SEED_ADMIN_PASSWORD` dan `SEED_WALI_PASSWORD` diatur
+sebelumnya.
+
+Dua flag opsional khusus database development/test:
+
+- `SEED_DEMO=1` menambah 9 laporan dummy (identitas fiktif, tiket
+  `SLP-202610-*`) lengkap dengan lampiran, lokasi, status, dan riwayat tindak
+  lanjut untuk uji coba dashboard dan pelacakan. Ditolak bila
+  `NODE_ENV=production`.
+- `SEED_RESET_PASSWORD=1` menimpa kata sandi akun yang sudah ada; kedua
+  `SEED_*_PASSWORD` wajib diisi.
+
+Contoh: `SEED_DEMO=1 npm run db:seed` (Git Bash) atau
+`$env:SEED_DEMO=1; npm run db:seed` (PowerShell).
 
 ### Menjalankan Server Pengembangan
 
