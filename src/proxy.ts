@@ -8,13 +8,18 @@ import { decryptSession, SESSION_COOKIE } from "@/lib/session";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sesi = await decryptSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const rumah = sesi?.peran === "admin" ? "/admin/dashboard" : "/wali-nagari/dashboard";
+
+  // Yang sudah punya sesi tidak perlu melihat form login lagi: langsung ke dashboard perannya.
+  if (pathname === "/admin/login") {
+    return sesi ? NextResponse.redirect(new URL(rumah, request.url)) : NextResponse.next();
+  }
 
   if (!sesi) {
     return NextResponse.redirect(new URL("/admin/login?akses=ditolak", request.url));
   }
 
   // Admin hanya ke /admin/*, Wali Nagari hanya ke /wali-nagari/*.
-  const rumah = sesi.peran === "admin" ? "/admin/dashboard" : "/wali-nagari/dashboard";
   const diizinkan = pathname.startsWith(sesi.peran === "admin" ? "/admin" : "/wali-nagari");
   if (!diizinkan) {
     return NextResponse.redirect(new URL(`${rumah}?akses=ditolak`, request.url));
@@ -24,5 +29,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/dashboard/:path*", "/wali-nagari/:path*"],
+  matcher: ["/admin/login", "/admin/dashboard/:path*", "/wali-nagari/:path*"],
 };
