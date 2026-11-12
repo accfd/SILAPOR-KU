@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dokumen penjelasan proyek (file Word biner; dibagikan lewat drive tim, bukan git)
+/Penjelasan proyek/
