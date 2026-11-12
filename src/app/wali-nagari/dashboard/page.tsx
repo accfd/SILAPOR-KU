@@ -169,6 +169,8 @@ export default function WaliNagariDashboardPage() {
   ];
 
   return (
+    <>
+    <DashboardHeader peran="wali_nagari" />
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       {/* TAMPILAN INTERAKTIF DI LAYAR (SCREEN ONLY) */}
       <div className="screen-only space-y-7">
@@ -183,7 +185,6 @@ export default function WaliNagariDashboardPage() {
             Ringkasan laporan dan perkembangan penanganan sebagai bahan evaluasi pelayanan.
           </p>
         </div>
-        <DashboardHeader peran="wali_nagari" />
       </div>
 
       {errorMessage && (
@@ -672,5 +673,6 @@ export default function WaliNagariDashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

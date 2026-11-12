@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import SiteChrome, { SiteFooter } from "@/components/SiteChrome";
 
 export const metadata: Metadata = {
   title: "SILAPOR-KU | Sistem Layanan Pengaduan & Aspirasi Nagari Kambang Utara",
@@ -22,9 +21,9 @@ export default function RootLayout({
   return (
     <html lang="id" className="h-full">
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans">
-        <Navbar />
+        <SiteChrome />
         <main className="flex-1">{children}</main>
-        <Footer />
+        <SiteFooter />
       </body>
     </html>
   );

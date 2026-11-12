@@ -185,6 +185,8 @@ export default function AdminDashboardPage() {
   };
 
   return (
+    <>
+    <DashboardHeader peran="admin" />
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       {/* TAMPILAN INTERAKTIF DI LAYAR (SCREEN ONLY) */}
       <div className="screen-only space-y-7">
@@ -199,7 +201,6 @@ export default function AdminDashboardPage() {
             Tinjau laporan, periksa bukti dan lokasi, lalu catat tindak lanjut resmi.
           </p>
         </div>
-        <DashboardHeader peran="admin" />
       </div>
 
       {errorMessage && (
@@ -669,5 +670,6 @@ export default function AdminDashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { LogOut, Loader2 } from "lucide-react";
 import { logoutAparatur } from "@/lib/actions/auth";
 import type { Peran } from "@/types";
@@ -14,6 +15,7 @@ export default function DashboardHeader({ peran }: DashboardHeaderProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const dashboardPath = peran === "admin" ? "/admin/dashboard" : "/wali-nagari/dashboard";
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -36,14 +38,28 @@ export default function DashboardHeader({ peran }: DashboardHeaderProps) {
   };
 
   return (
-    <div className="no-print flex flex-col items-end gap-2">
-      <div className="flex items-center gap-3">
-        <span className="hidden text-right sm:block">
-          <span className="block text-xs font-semibold text-slate-800">
-            {peran === "admin" ? "Admin Nagari" : "Wali Nagari"}
+    <header className="no-print border-b border-slate-200 bg-white">
+      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 py-2 sm:px-6 lg:px-8">
+        <Link
+          href={dashboardPath}
+          aria-label="SILAPOR-KU, kembali ke dashboard"
+          className="flex min-w-0 items-center gap-3"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/Logo.webp"
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-lg font-bold tracking-tight text-slate-900">
+              SILAPOR<span className="text-emerald-600">-KU</span>
+            </span>
+            <span className="block truncate text-xs font-medium text-slate-500">
+              Nagari Kambang Utara
+            </span>
           </span>
-          <span className="block text-xs text-slate-500">Portal Aparatur</span>
-        </span>
+        </Link>
         <button
           type="button"
           onClick={handleLogout}
@@ -55,10 +71,10 @@ export default function DashboardHeader({ peran }: DashboardHeaderProps) {
         </button>
       </div>
       {errorMessage && (
-        <p role="alert" className="max-w-xs text-right text-xs text-rose-700">
+        <p role="alert" className="mx-auto max-w-7xl px-4 pb-2 text-right text-xs text-rose-700 sm:px-6 lg:px-8">
           {errorMessage}
         </p>
       )}
-    </div>
+    </header>
   );
 }
