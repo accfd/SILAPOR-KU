@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { jorong, kategori, lampiran, laporan, pelapor } from "@/db/schema";
 import { gagal, gagalValidasi, sukses, tanganiError } from "@/lib/action-result";
 import { wajibAparatur } from "@/lib/auth";
+import { KATEGORI_LAINNYA } from "@/lib/constants";
 import { generateTicketCode } from "@/lib/utils";
 import {
   createLaporanSchema,
@@ -43,9 +44,16 @@ export async function getOpsiFormulir(): Promise<ActionResult<OpsiFormulir>> {
   try {
     const [daftarJorong, daftarKategori] = await Promise.all([
       db.select().from(jorong).orderBy(asc(jorong.nama_jorong)),
-      db.select().from(kategori).orderBy(asc(kategori.nama_kategori)),
+      db.select().from(kategori),
     ]);
-    return sukses("Opsi formulir berhasil dimuat.", { jorong: daftarJorong, kategori: daftarKategori });
+    // Urut abjad, kecuali "Lainnya" selalu di paling bawah. Diurutkan di sini (bukan di SQL)
+    // agar hasilnya tetap sama apa pun collation database-nya.
+    const kategoriUrut = [...daftarKategori].sort(
+      (a, b) =>
+        Number(a.nama_kategori === KATEGORI_LAINNYA) - Number(b.nama_kategori === KATEGORI_LAINNYA) ||
+        a.nama_kategori.localeCompare(b.nama_kategori, "id"),
+    );
+    return sukses("Opsi formulir berhasil dimuat.", { jorong: daftarJorong, kategori: kategoriUrut });
   } catch (error) {
     return tanganiError("getOpsiFormulir", error);
   }
